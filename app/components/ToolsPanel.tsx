@@ -19,6 +19,7 @@ import { Background, Controls, ReactFlow, useNodesState, type Connection, type N
 import '@xyflow/react/dist/style.css';
 import type { ActionItem, Mission, Note, Tool } from '../lib/types';
 import './tools.css';
+import {captureMapIdea} from '../lib/knowledge';
 
 export interface ToolsPanelProps {
   tool: Tool;
@@ -42,39 +43,42 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 function mapNodes(mission: Mission): Node[] {
-  return mission.nodes.map(node => ({ id: node.id, position: { x: node.x, y: node.y }, data: { label: node.label }, className: `tp-map-node tp-map-${node.type}`, style: { borderRadius: 10, padding: '12px 15px', fontSize: 12, width: 160 } }));
+  return mission.nodes.map(node => ({ id: node.id, position: { x: node.x, y: node.y }, data: { label: node.label }, deletable:node.id!=='mission', className: `tp-map-node tp-map-${node.type}`, style: { borderRadius: 10, padding: '12px 15px', fontSize: 12, width: 160 } }));
 }
 
-function ThinkingMap({ mission, onChange }: Pick<ToolsPanelProps, 'mission' | 'onChange'>) {
+export function ThinkingMap({ mission, onChange, busy=false, onOpenNote }: Pick<ToolsPanelProps, 'mission' | 'onChange'> & {busy?:boolean;onOpenNote?:(id:string)=>void}) {
   const [nodes, setNodes, onNodesChange] = useNodesState(mapNodes(mission));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [label, setLabel] = useState('');
   const [relationship, setRelationship] = useState('Supports');
+  const [mapMessage,setMapMessage]=useState('');
   useEffect(() => { setNodes(mapNodes(mission)); }, [mission.nodes, setNodes]);
   const selected = mission.nodes.find(n => n.id === selectedId);
   const statement = mission.statements.find(s => s.id === selected?.statementId);
+  const linkedNote=mission.notes.find(n=>n.id===selected?.noteId);
   const connect = (connection: Connection) => {
-    if (!connection.source || !connection.target || connection.source === connection.target) return;
+    if (busy || !connection.source || !connection.target || connection.source === connection.target) return;
     if (mission.edges.some(e => e.source === connection.source && e.target === connection.target && e.label === relationship)) return;
     onChange({ ...mission, edges: [...mission.edges, { id: crypto.randomUUID(), source: connection.source, target: connection.target, label: relationship }] });
   };
   function addNode(event: React.FormEvent) {
     event.preventDefault();
-    if (!label.trim()) return;
+    if (busy || !label.trim()) return;
     const id = crypto.randomUUID();
     onChange({ ...mission, nodes: [...mission.nodes, { id, label: label.trim(), x: 50 + mission.nodes.length % 2 * 190, y: 80 + Math.floor(mission.nodes.length / 2) * 100, type: 'idea' }] });
     setLabel(''); setSelectedId(id);
   }
   return <>
     <div className="tp-map" aria-label="Interactive thinking map">
-      <ReactFlow nodes={nodes} edges={mission.edges.map(e => ({ ...e, type: 'smoothstep', style: { stroke: 'var(--text)', strokeWidth: 2 }, labelStyle: { fontSize: 10, fontWeight: 700, fill: 'var(--text)' } }))} onNodesChange={onNodesChange} onConnect={connect} onNodeClick={(_, node) => setSelectedId(node.id)} onNodeDragStop={(_, node) => onChange({ ...mission, nodes: mission.nodes.map(n => n.id === node.id ? { ...n, x: node.position.x, y: node.position.y } : n) })} onNodesDelete={removed => { const ids = new Set(removed.map(n => n.id)); onChange({ ...mission, nodes: mission.nodes.filter(n => !ids.has(n.id)), edges: mission.edges.filter(e => !ids.has(e.source) && !ids.has(e.target)) }); }} onEdgesDelete={removed => onChange({ ...mission, edges: mission.edges.filter(e => !removed.some(r => r.id === e.id)) })} fitView minZoom={0.15} maxZoom={2} deleteKeyCode={['Backspace', 'Delete']} ariaLabelConfig={{ 'controls.zoomIn.ariaLabel': 'Zoom in on thinking map', 'controls.zoomOut.ariaLabel': 'Zoom out of thinking map', 'controls.fitView.ariaLabel': 'Fit all ideas in view' }}>
+      <ReactFlow nodesDraggable={!busy} nodesConnectable={!busy} elementsSelectable={!busy} nodes={nodes} edges={mission.edges.map(e => ({ ...e, type: 'smoothstep', style: { stroke: 'var(--text)', strokeWidth: 2 }, labelStyle: { fontSize: 10, fontWeight: 700, fill: 'var(--text)' } }))} onNodesChange={onNodesChange} onSelectionChange={({nodes:selected})=>{if(selected.length===1)setSelectedId(selected[0].id);}} onConnect={connect} onNodeClick={(_, node) => setSelectedId(node.id)} onNodeDragStop={(_, node) => onChange({ ...mission, nodes: mission.nodes.map(n => n.id === node.id ? { ...n, x: node.position.x, y: node.position.y } : n) })} onNodesDelete={removed => { const ids = new Set(removed.map(n => n.id)); onChange({ ...mission, nodes: mission.nodes.filter(n => !ids.has(n.id)), edges: mission.edges.filter(e => !ids.has(e.source) && !ids.has(e.target)) }); }} onEdgesDelete={removed => onChange({ ...mission, edges: mission.edges.filter(e => !removed.some(r => r.id === e.id)) })} fitView minZoom={0.15} maxZoom={2} deleteKeyCode={busy?null:['Backspace', 'Delete']} ariaLabelConfig={{ 'controls.zoomIn.ariaLabel': 'Zoom in on thinking map', 'controls.zoomOut.ariaLabel': 'Zoom out of thinking map', 'controls.fitView.ariaLabel': 'Fit all ideas in view' }}>
         <Background color="#7b8a94" gap={20} size={1.4} /><Controls showInteractive={false} />
       </ReactFlow>
     </div>
-    <p className="tp-hint">Drag ideas to arrange them. Connect their handles to link thoughts.</p>
+    <p className="tp-hint">Drag ideas to arrange them. Connect handles to link thoughts. Select an idea to turn it into an Obsidian note.</p>
     <label className="tp-field">Relationship<select value={relationship} onChange={e => setRelationship(e.target.value)}>{['Supports', 'Challenges', 'Contradicts', 'Depends On', 'Causes', 'Leads To'].map(r => <option key={r}>{r}</option>)}</select></label>
-    <form onSubmit={addNode} className="tp-form"><label className="tp-field">Add an idea<input value={label} maxLength={200} onChange={e => setLabel(e.target.value)} placeholder="Something worth exploring" /></label><button className="tp-button" disabled={!label.trim()}><Plus size={16} /> Add to map</button></form>
-    {selected && <div className="tp-detail"><div className="tp-row"><span className="tp-kicker">Selected idea</span><button className="tp-icon-button" title="Remove idea" aria-label="Remove selected idea" onClick={() => { onChange({ ...mission, nodes: mission.nodes.filter(n => n.id !== selected.id), edges: mission.edges.filter(e => e.source !== selected.id && e.target !== selected.id) }); setSelectedId(null); }}><Trash size={16} /></button></div><label className="tp-field">Idea text<textarea value={selected.label} onChange={e => onChange({ ...mission, nodes: mission.nodes.map(n => n.id === selected.id ? { ...n, label: e.target.value } : n) })} /></label>{statement && <p>{statement.detail}</p>}</div>}
+    <form onSubmit={addNode} className="tp-form"><label className="tp-field">Add an idea<input disabled={busy} value={label} maxLength={200} onChange={e => setLabel(e.target.value)} placeholder="Something worth exploring" /></label><button className="tp-button" disabled={busy||!label.trim()}><Plus size={16} /> Add to map</button></form>
+    {selected && <div className="tp-detail"><div className="tp-row"><span className="tp-kicker">Selected idea</span><button disabled={busy||selected.id==='mission'} className="tp-icon-button" title="Remove idea" aria-label="Remove selected idea" onClick={() => { onChange({ ...mission, nodes: mission.nodes.filter(n => n.id !== selected.id), edges: mission.edges.filter(e => e.source !== selected.id && e.target !== selected.id) }); setSelectedId(null); }}><Trash size={16} /></button></div><label className="tp-field">Idea text<textarea disabled={busy} maxLength={4000} value={selected.label} onChange={e => onChange({ ...mission, nodes: mission.nodes.map(n => n.id === selected.id ? { ...n, label: e.target.value } : n) })} /></label>{statement && <p>{statement.detail}</p>}<button className="tp-button tp-primary" disabled={busy} onClick={()=>{try{const captured=captureMapIdea(mission,selected.id);onChange(captured.mission);setMapMessage('Idea linked to a note.');onOpenNote?.(captured.noteId);}catch(e){setMapMessage((e as Error).message);}}}><FloppyDisk size={16}/>{linkedNote?'Open linked note':'Save idea as note'}</button></div>}
+    {mapMessage&&<p className="tp-hint" role="status">{mapMessage}</p>}
   </>;
 }
 
@@ -105,7 +109,7 @@ function Vault({ mission, onChange }: Pick<ToolsPanelProps, 'mission' | 'onChang
   function update(note: Note, changes: Partial<Note>) { onChange({ ...mission, notes: mission.notes.map(n => n.id === note.id ? { ...n, ...changes, updatedAt: new Date().toISOString() } : n) }); }
   function add() { const note = { id: crypto.randomUUID(), title: 'Untitled note', content: '', updatedAt: new Date().toISOString() }; onChange({ ...mission, notes: [...mission.notes, note] }); setSelectedId(note.id); }
   async function exportNotes(format: 'markdown' | 'zip') {
-    try { const exports = await import('../lib/export'); const name = exports.safeFileName(mission.title); if (format === 'markdown') exports.downloadFile(`${name}.md`, exports.missionMarkdown(mission)); else exports.downloadFile(`${name}.zip`, exports.exportMissionZip(mission), 'application/zip'); setMessage('Export downloaded.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not export notes.'); }
+    try { const exports = await import('../lib/export'); const name = exports.safeFileName(mission.title); if (format === 'markdown') exports.downloadFile(`${name}.md`, exports.missionMarkdown(mission)); else exports.downloadFile(`${name}.zip`, exports.exportObsidianBundle(mission), 'application/zip'); setMessage('Export downloaded.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not export notes.'); }
   }
   async function importFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -134,5 +138,5 @@ export default function ToolsPanel({ tool, mission, onChange, onCommand, busy, o
   const [error, setError] = useState('');
   const info = titles[tool]; const Icon = info.icon;
   const command: ToolsPanelProps['onCommand'] = async (action, prompt) => { setError(''); try { await onCommand(action, prompt); } catch (err) { setError(err instanceof Error ? err.message : 'That did not finish. Please try again.'); } };
-  return <aside className="tools-panel" aria-label={info.name}><header className="tp-header"><span className="tp-header-icon"><Icon size={23} weight="bold" /></span><div><h2>{info.name}</h2><p>{info.description}</p></div><button className="tp-icon-button" aria-label="Close thinking tool" onClick={onClose}><X size={18} /></button></header><div className="tp-body" key={`${mission.id}-${tool}`}>{error && <p className="tp-error" role="alert">{error}</p>}{tool === 'map' && <ThinkingMap mission={mission} onChange={onChange} />}{tool === 'evidence' && <Evidence mission={mission} command={command} busy={busy} />}{tool === 'lab' && <Lab mission={mission} command={command} busy={busy} />}{tool === 'vault' && <Vault mission={mission} onChange={onChange} />}{tool === 'path' && <Path mission={mission} onChange={onChange} command={command} busy={busy} />}</div><footer className="tp-footer"><span>One question. Many possibilities.</span><span className="tp-footer-mark"><GitBranch size={14} /></span></footer></aside>;
+  return <aside className="tools-panel" aria-label={info.name}><header className="tp-header"><span className="tp-header-icon"><Icon size={23} weight="bold" /></span><div><h2>{info.name}</h2><p>{info.description}</p></div><button className="tp-icon-button" aria-label="Close thinking tool" onClick={onClose}><X size={18} /></button></header><div className="tp-body" key={`${mission.id}-${tool}`}>{error && <p className="tp-error" role="alert">{error}</p>}{tool === 'map' && <ThinkingMap mission={mission} onChange={onChange} busy={busy} />}{tool === 'evidence' && <Evidence mission={mission} command={command} busy={busy} />}{tool === 'lab' && <Lab mission={mission} command={command} busy={busy} />}{tool === 'vault' && <Vault mission={mission} onChange={onChange} />}{tool === 'path' && <Path mission={mission} onChange={onChange} command={command} busy={busy} />}</div><footer className="tp-footer"><span>One question. Many possibilities.</span><span className="tp-footer-mark"><GitBranch size={14} /></span></footer></aside>;
 }

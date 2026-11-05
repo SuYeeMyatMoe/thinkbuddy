@@ -30,7 +30,8 @@ export function createDemoMission(title = 'How can we make our school more eco-f
   return addThinkingNodes(mission, statements);
 }
 export function addThinkingNodes(mission: Mission, statements: Statement[]): Mission {
-  const nodes = mission.nodes.length ? [...mission.nodes] : [{ id: 'mission', label: mission.title, x: 260, y: 10, type: 'mission' }];
+  const nodes = [...mission.nodes];
+  if(!nodes.some(n=>n.id==='mission'))nodes.unshift({ id: 'mission', label: mission.title, x: 260, y: 10, type: 'mission' });
   const edges = [...mission.edges];
   for (const s of statements.filter(s => s.mascotId !== 'buddy')) {
     if (nodes.some(n => n.statementId === s.id)) continue;

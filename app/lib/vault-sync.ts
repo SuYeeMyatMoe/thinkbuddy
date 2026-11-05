@@ -1,5 +1,5 @@
 import type { Note } from './types';
-import { noteMarkdown, parseMarkdown, preserveVaultProperties, safeFileName } from './export';
+import { noteMarkdown, noteExportName, parseMarkdown, preserveVaultProperties, safeFileName } from './export';
 
 interface VaultFile { kind: 'file'; name: string; getFile(): Promise<File>; createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }> }
 interface VaultDirectory { kind: 'directory'; name: string; getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<VaultDirectory>; getFileHandle(name: string, options?: { create?: boolean }): Promise<VaultFile>; removeEntry(name: string): Promise<void>; values(): AsyncIterable<VaultFile | VaultDirectory>; queryPermission(options: { mode: 'readwrite' }): Promise<PermissionState>; requestPermission(options: { mode: 'readwrite' }): Promise<PermissionState> }
@@ -47,7 +47,7 @@ export async function reconnectVault(): Promise<string> {
 }
 export async function disconnectVault(): Promise<void> { current = null; currentVaultId = ''; await persist('vault', undefined); }
 export async function noteHash(note: Note): Promise<string> {
-  const bytes = new TextEncoder().encode(JSON.stringify([note.title, note.content.replace(/\r\n/g, '\n').replace(/\n$/, ''), note.statementId || '']));
+  const bytes = new TextEncoder().encode(JSON.stringify([note.title, note.content.replace(/\r\n/g, '\n').replace(/\n$/, ''), note.statementId || '',note.theme||'',note.origin||'']));
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
 }
 export function decideSync(base: string | undefined, local: string | undefined, remote: string | undefined): 'equal' | 'to-local' | 'to-cloud' | 'conflict' | 'deleted-local' | 'deleted-cloud' | 'gone' {
@@ -96,7 +96,7 @@ async function synchronize(missionId: string, notes: Note[], save: (notes: Note[
     if (duplicates.has(id)) continue;
     const l = local.get(id), r = remote.get(id), rh = r ? await noteHash(r) : undefined;
     const decision = decideSync(base[id]?.hash, l?.hash, rh);
-    const path = l?.path || base[id]?.path || `${safeFileName(id)}.md`;
+    const path = l?.path || base[id]?.path || (r?noteExportName(r):`${safeFileName(id)}.md`);
     let action: 'to-local' | 'to-cloud' | 'equal' | 'gone' | 'delete-local' | 'delete-remote' | undefined;
     if (decision === 'conflict' || decision === 'deleted-local' || decision === 'deleted-cloud') {
       const resolution = resolutions[id];

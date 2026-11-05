@@ -56,14 +56,26 @@ export function missionMarkdown(mission: Mission): string {
   if(mission.outcome)parts.push('', '## Outcome review',mission.outcome.observed,'',mission.outcome.learned);
   return parts.join('\n');
 }
-export const noteExportName = (note: Note) => `${safeFileName(note.title)}--${safeFileName(note.id)}.md`;
-export function missionCanvas(mission: Mission): string {
-  return JSON.stringify({ nodes: mission.nodes.map(n => ({ id: n.id, type: 'text', text: n.label, x: n.x, y: n.y, width: 240, height: 120 })), edges: mission.edges.map(e => ({ id: e.id, fromNode: e.source, toNode: e.target, label: e.label, toEnd: 'arrow' })) }, null, 2);
+export const noteExportName = (note: Note) => `${safeFileName(note.title).replace(/[#|^\[\]%]/g,'-')}--${safeFileName(note.id)}.md`;
+export function missionCanvas(mission: Mission,noteDirectory=''): string {
+  return JSON.stringify({ nodes: mission.nodes.map(n => {
+    const note=mission.notes.find(note=>note.id===n.noteId||(n.statementId&&note.statementId===n.statementId));
+    return {id:n.id,...(note?{type:'file',file:(noteDirectory?noteDirectory+'/':'')+noteExportName(note)}:{type:'text',text:n.label}),x:Math.round(n.x),y:Math.round(n.y),width:240,height:160};
+  }), edges: mission.edges.map(e => ({ id: e.id, fromNode: e.source, toNode: e.target, label: e.label, toEnd: 'arrow' })) }, null, 2);
 }
 export function exportMissionZip(mission: Mission): Uint8Array {
   const files: Record<string, Uint8Array> = { 'Mission.md': strToU8(missionMarkdown(mission)), 'ThinkMap.canvas': strToU8(missionCanvas(mission)) };
   for (const note of mission.notes) files[noteExportName(note)] = strToU8(noteMarkdown(note, mission.id));
   return zipSync(files, { level: 6 });
+}
+export function exportObsidianBundle(mission:Mission):Uint8Array{
+  const folder=`ThinkBuddy/${safeFileName(mission.id)}`;
+  const files:Record<string,Uint8Array>={
+    [`${folder}/Mission.md`]:strToU8(missionMarkdown(mission)),
+    [`${folder}/ThinkMap.canvas`]:strToU8(missionCanvas(mission,folder)),
+  };
+  for(const note of mission.notes)files[`${folder}/${noteExportName(note)}`]=strToU8(noteMarkdown(note,mission.id));
+  return zipSync(files,{level:6});
 }
 export function downloadFile(name: string, content: string | Uint8Array, type = 'text/markdown') {
   const data = typeof content === 'string' ? content : new Uint8Array(content).buffer;

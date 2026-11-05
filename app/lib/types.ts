@@ -11,7 +11,7 @@ export interface MissionBrief { success: string; audience: string; resources: st
 export interface MissionResult { summary: string; recommendation: string; changed: string; unresolved: string[]; nextStep: string; options: { name: string; benefit: string; cost?: string; effort: string; risk: string; evidenceGap: string }[]; experiment: { action: string; owner: string; successMeasure: string; reviewDate: string }; updatedAt: string; }
 export interface ActionItem { id: string; text: string; done: boolean; priority: 'High' | 'Medium' | 'Low'; deadline: string; dependsOn: string; }
 export interface Scenario { id: string; name: string; assumption: string; outcome: string; }
-export interface MapNode { id: string; label: string; x: number; y: number; type: string; statementId?: string; }
+export interface MapNode { id: string; label: string; x: number; y: number; type: string; statementId?: string; noteId?: string; }
 export interface MapEdge { id: string; source: string; target: string; label: string; }
 export interface Mission { id: string; title: string; mode: 'Quick' | 'Standard' | 'Deep'; mascots: Mascot[]; statements: Statement[]; notes: Note[]; actions: ActionItem[]; scenarios: Scenario[]; nodes: MapNode[]; edges: MapEdge[]; reflection: string; round: number; revision: number; createdAt: string; updatedAt: string; messages?: ConversationMessage[]; questions?: CouncilQuestion[]; brief?: MissionBrief; result?: MissionResult; outcome?: { observed: string; learned: string; updatedAt: string }; }
 export interface CouncilRequest { action: 'generate' | 'turn' | 'evidence' | 'scenario' | 'plan' | 'replace'; mission: Mission; prompt?: string; mascotIds?: string[]; }

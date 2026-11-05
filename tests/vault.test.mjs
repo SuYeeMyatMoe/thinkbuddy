@@ -12,7 +12,7 @@ for (const name of ['export', 'vault-sync']) {
   await writeFile(new URL(`${name}.mjs`, output), compiled);
 }
 const { decideSync, noteHash } = await import(new URL('vault-sync.mjs', output));
-const { noteMarkdown, parseMarkdown, safeImportPath, importNotes, exportMissionZip, preserveVaultProperties } = await import(new URL('export.mjs', output));
+const { noteMarkdown, parseMarkdown, safeImportPath, importNotes, exportMissionZip, exportObsidianBundle, preserveVaultProperties } = await import(new URL('export.mjs', output));
 const note = { id: 'n1', title: 'A title: with "quotes"', content: '# Thought\n\nA [[linked thought]].', updatedAt: '2026-11-04T12:00:00Z', statementId: 's1' };
 
 test('managed note round-trips content and identifiers', () => {
@@ -59,4 +59,22 @@ test('sync preserves custom YAML properties on existing vault notes', () => {
   const previous = '---\nthinkbuddy_id: "n1"\ntitle: "Old"\ncustom:\n  nested: true\naliases: [hello]\n---\nOld';
   const updated = preserveVaultProperties(previous, noteMarkdown(note, 'm1'));
   assert.match(updated, /custom:\n  nested: true/); assert.match(updated, /aliases: \[hello\]/); assert.doesNotMatch(updated, /title: "Old"/);
+});
+
+test('Obsidian exports preserve themes and automatic-note provenance',async()=>{
+ const themed={...note,theme:'Evidence',origin:'automatic'};
+ assert.deepEqual(parseMarkdown(noteMarkdown(themed,'m1'),'fallback','fallback').note,themed);
+ assert.notEqual(await noteHash(themed),await noteHash({...themed,theme:'Decisions'}));
+});
+
+test('Canvas links map ideas to actual exported Markdown files and rounds positions',()=>{
+ const mission={id:'m1',title:'Linked map',updatedAt:note.updatedAt,mascots:[],statements:[],notes:[note],reflection:'',scenarios:[],actions:[],nodes:[{id:'idea',label:'My idea',x:10.5,y:20.1,type:'note',noteId:note.id}],edges:[]};
+ const files=unzipSync(exportMissionZip(mission));const canvas=JSON.parse(strFromU8(files['ThinkMap.canvas']));
+ assert.equal(canvas.nodes[0].type,'file');assert.ok(files[canvas.nodes[0].file]);assert.equal(canvas.nodes[0].x,11);assert.equal(canvas.nodes[0].y,20);
+});
+
+test('Obsidian bundle paths resolve from the vault root without colliding across missions',()=>{
+ const mission={id:'m1',title:'Linked map',updatedAt:note.updatedAt,mascots:[],statements:[],notes:[note],reflection:'',scenarios:[],actions:[],nodes:[{id:'idea',label:'My idea',x:1,y:2,type:'note',noteId:note.id}],edges:[]};
+ const files=unzipSync(exportObsidianBundle(mission));const canvas=JSON.parse(strFromU8(files['ThinkBuddy/m1/ThinkMap.canvas']));
+ assert.ok(files['ThinkBuddy/m1/Mission.md']);assert.ok(files[canvas.nodes[0].file]);assert.ok(canvas.nodes[0].file.startsWith('ThinkBuddy/m1/'));
 });

@@ -13,7 +13,7 @@ export const missionSchema = z.object({
   notes: z.array(z.object({ id: identifier, title: short, content: z.string().max(100000), updatedAt: stamp, statementId: identifier.optional(), origin:z.enum(['automatic','user']).optional(),theme:short.optional() })).max(500),
   actions: z.array(z.object({ id: identifier, text: z.string().max(2000), done: z.boolean(), priority: z.enum(['High', 'Medium', 'Low']), deadline: z.string().max(100), dependsOn: z.string().max(100) })).max(500),
   scenarios: z.array(z.object({ id: identifier, name: short, assumption: z.string().max(4000), outcome: z.string().max(16000) })).max(100),
-  nodes: z.array(z.object({ id: identifier, label: z.string().max(4000), x: z.number().finite(), y: z.number().finite(), type: short, statementId: identifier.optional() })).max(1000),
+  nodes: z.array(z.object({ id: identifier, label: z.string().max(4000), x: z.number().finite(), y: z.number().finite(), type: short, statementId: identifier.optional(), noteId:identifier.optional() })).max(1000),
   edges: z.array(z.object({ id: identifier, source: identifier, target: identifier, label: short })).max(2000),
   reflection: z.string().max(16000), round: z.number().int().min(0).max(10000), revision: z.number().int().min(0), createdAt: stamp, updatedAt: stamp,
   messages:z.array(z.object({id:identifier,text:z.string().max(16000),createdAt:stamp,kind:z.enum(['message','takeaway']),attachments:z.array(attachmentSchema).max(3).optional()})).max(1000).optional(),
