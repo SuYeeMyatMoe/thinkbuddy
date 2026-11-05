@@ -346,6 +346,12 @@ textarea::placeholder,input::placeholder{color:var(--muted);opacity:.85}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .tp-primary{color:#111!important}
+.tool-mission-picker{display:flex;flex-direction:column;gap:8px;font-size:12px;font-weight:800;margin-bottom:20px}
+.tool-mission-picker select{width:100%;min-width:0;padding:10px;border:2px solid var(--ink);border-radius:10px;background:var(--surface-2);color:var(--text);font:inherit}
+.vault-dialog-panel .tools-panel{width:100%;min-width:0;max-height:65dvh}
+.workspace-empty{padding:20px 0;line-height:1.8}
+.workspace-empty h3{font-size:20px;font-weight:800}
+.workspace-empty p{font-size:13px;color:var(--muted);margin:12px 0 22px}
 
 /* Fit the council to its container, including when thinking tools are open. */
 .responsive-council{container-type:inline-size;container-name:council}

@@ -18,7 +18,7 @@ export default function SyncPanel({mission,onSave}:{mission:Mission;onSave:(miss
   useEffect(()=>{void restoreVault().then(name=>{if(name){setVault(name);setStatus('Connected. Choose Sync now to start.');}}).catch(e=>setError(e.message));},[]);
   async function synchronize(){
     if(running.current)return;running.current=true;setBusy(true);setError('');
-    try{const m=current.current;const result=await syncVault(m.id,m.notes,async notes=>{await saveRef.current({...current.current,notes});},resolutions);setConflicts(result.conflicts);setResolutions({});setStatus(result.conflicts.length?'Review conflicting changes before continuing.':'Synced '+new Date(result.syncedAt).toLocaleTimeString()+' · '+result.written+' written, '+result.imported+' imported');if(result.conflicts.length)setAuto(false);}
+    try{const m=current.current;const result=await syncVault(m.id,m.notes,async notes=>{await saveRef.current({...m,notes});},resolutions);setConflicts(result.conflicts);setResolutions({});setStatus(result.conflicts.length?'Review conflicting changes before continuing.':'Synced '+new Date(result.syncedAt).toLocaleTimeString()+' · '+result.written+' written, '+result.imported+' imported');if(result.conflicts.length)setAuto(false);}
     catch(e){setError((e as Error).message);setAuto(false);}finally{running.current=false;setBusy(false);}
   }
   const syncRef=useRef(synchronize);syncRef.current=synchronize;
