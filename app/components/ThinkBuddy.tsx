@@ -1,5 +1,7 @@
 'use client';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import MissionLanding from './MissionLanding';
 import { ArrowUpRight } from '@phosphor-icons/react/dist/csr/ArrowUpRight';
 import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
@@ -58,7 +60,9 @@ function Modal({title,onClose,children,wide=false,open=true}:{title:string;onClo
 interface ApiResult { error?: string; mission: Mission; missions: Mission[]; live: boolean; text: string; }
 async function jsonRequest(url:string,init?:RequestInit):Promise<ApiResult>{const r=await fetch(url,init);const data=await r.json() as ApiResult;if(!r.ok)throw new Error(data.error||'Request failed ('+r.status+')');return data;}
 
-export default function ThinkBuddy({userName,guest=false}:{userName:string;guest?:boolean}){
+export default function ThinkBuddy({userName,guest=false,missionId}:{userName:string;guest?:boolean;missionId?:string}){
+  const router=useRouter();
+  const [ready,setReady]=useState(false);
   const [mission,setMission]=useState<Mission|null>(null),[missions,setMissions]=useState<Mission[]>([]);
   const [live,setLive]=useState(false),[tool,setTool]=useState<Tool|null>(null),[selected,setSelected]=useState<string[]>([]);
   const [input,setInput]=useState(''),[busy,setBusy]=useState(false),[active,setActive]=useState<string|null>(null);
@@ -96,11 +100,14 @@ export default function ThinkBuddy({userName,guest=false}:{userName:string;guest
   useEffect(()=>{
     let disposed=false;
     Promise.all(guest?[Promise.resolve().then(()=>({missions:loadGuestMissions()})),Promise.resolve({live:false})]:[jsonRequest('/api/missions'),jsonRequest('/api/config')]).then(async([data,config])=>{
-      if(disposed)return;setLive(config.live);setMissions(data.missions);const m=data.missions[0]||createDemoMission();setMission(m);current.current=m;setSaveStatus(data.missions.length?'All changes saved':'Sample mission');
-      if(!data.missions.length)await save(m);
+      if(disposed)return;setLive(config.live);setMissions(data.missions);
+      let m=missionId?data.missions.find((item:Mission)=>item.id===missionId):null;
+      if(missionId&&!m&&!guest){const found=await jsonRequest('/api/missions?id='+encodeURIComponent(missionId));m=found.mission;}
+      if(disposed)return;setMission(m||null);current.current=m||null;setReady(true);setSaveStatus(guest?'Saved in this browser':'All changes saved');
+      if(missionId&&!m)setError('This mission is not available in this workspace. Start a new mission from Home.');
     }).catch(e=>{if(!disposed){setError(e.message);setSaveStatus('Workspace unavailable');}});
     return()=>{disposed=true;abort.current?.abort();playback.current.forEach(clearTimeout);if(debounce.current)clearTimeout(debounce.current);if(voiceTimer.current)clearTimeout(voiceTimer.current);recorder.current?.stream.getTracks().forEach(t=>t.stop());};
-  },[save,guest]);
+  },[save,guest,missionId]);
   useEffect(()=>{const guard=(e:BeforeUnloadEvent)=>{if(dirty.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[]);
   const highlight=(next:Mission)=>{playback.current.forEach(clearTimeout);next.mascots.forEach((m,i)=>playback.current.push(setTimeout(()=>setActive(m.id),i*2000)));playback.current.push(setTimeout(()=>setActive(null),next.mascots.length*2000));};
   async function command(action:CouncilRequest['action'],prompt='',base?:Mission,ids?:string[]){
@@ -109,18 +116,22 @@ export default function ThinkBuddy({userName,guest=false}:{userName:string;guest
       await flush();const fresh=base||current.current!;
       if(guest){
         const result=demoCouncil({action,mission:fresh,prompt,mascotIds:ids||selected});
-        current.current=result;setMission(result);setInput('');await save(result);highlight(result);return;
+        current.current=result;setMission(result);setInput('');await save(result);highlight(result);return true;
       }
       const response=await fetch('/api/council',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action,mission:fresh,prompt,mascotIds:ids||selected}),signal:abort.current.signal});
       if(!response.ok){const e=await response.json() as {error?:string};throw new Error(e.error||'The council could not respond.');}
       const reader=response.body!.getReader(),decoder=new TextDecoder();let buffer='',result:Mission|null=null;
       while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let end;while((end=buffer.indexOf('\n\n'))>=0){const frame=buffer.slice(0,end);buffer=buffer.slice(end+2);const event=frame.split('\n').find(l=>l.startsWith('event: '))?.slice(7);const payload=frame.split('\n').find(l=>l.startsWith('data: '))?.slice(6);if(!payload)continue;const data=JSON.parse(payload);if(event==='error')throw new Error(data.error);if(event==='statement')setActive(data.mascotId);if(event==='complete')result=data.mission;}}
       if(!result)throw new Error('The response was interrupted. Your saved mission is safe.');
-      current.current=result;setMission(result);setInput('');await save(result);highlight(result);
-    }catch(e){if(e instanceof Error&&e.name==='AbortError'){setPaused(true);setNotice('Discussion paused. Your previous thoughts are saved.');}else setError(e instanceof Error?e.message:'Something went wrong.');}finally{setBusy(false);abort.current=null;}
+      current.current=result;setMission(result);setInput('');await save(result);highlight(result);return true;
+    }catch(e){if(e instanceof Error&&e.name==='AbortError'){setPaused(true);setNotice('Discussion paused. Your previous thoughts are saved.');}else setError(e instanceof Error?e.message:'Something went wrong.');return false;}finally{setBusy(false);abort.current=null;}
   }
-  async function newMission(title:string){if(!title.trim())return;await flush();const next=createDemoMission(title.trim());next.statements=[];next.nodes=[];next.edges=[];next.round=0;setModal(null);setSelected([]);setTool(null);current.current=next;setMission(next);await command('generate','',next);}
-  async function openMission(m:Mission){await flush();playback.current.forEach(clearTimeout);setActive(null);setMission(m);current.current=m;setSelected([]);setModal(null);setSidebar(false);setTool(null);}
+  async function goHome(){if(busy)return;try{await flush();setModal(null);setSidebar(false);setTool(null);setNewTitle('');router.push('/');}catch(e){setError((e as Error).message);}}
+  async function newMission(title:string){
+    if(!title.trim()||busy)return;
+    try{await flush();playback.current.forEach(clearTimeout);setActive(null);const next=createDemoMission(title.trim());next.statements=[];next.nodes=[];next.edges=[];next.round=0;setModal(null);setSelected([]);setTool(null);current.current=next;setMission(next);const ok=await command('generate','',next);if(ok)router.push('/mission/'+encodeURIComponent(next.id));}catch(e){setError((e as Error).message);}
+  }
+  async function openMission(m:Mission){try{await flush();playback.current.forEach(clearTimeout);setActive(null);setSelected([]);setModal(null);setSidebar(false);setTool(null);router.push('/mission/'+encodeURIComponent(m.id));}catch(e){setError((e as Error).message);}}
   async function startRecording(){
     if(recording){recorder.current?.stop();return;}
     if(!live){setError('Voice transcription needs an OpenAI API key. You can type your question in demo mode.');return;}
@@ -137,11 +148,11 @@ export default function ThinkBuddy({userName,guest=false}:{userName:string;guest
       <nav className="navbar" aria-label="Main">
         <a className="brand" href="/" aria-label="ThinkBuddy home"><span className="brand-icon"><Sprite index={0}/></span><span className="brand-name">ThinkBuddy</span></a>
         <div className={'nav-links '+(sidebar?'is-open':'')}>
-          <button className={!modal&&!tool?'nav-active':''} onClick={()=>{setTool(null);setModal(null);setSidebar(false);}}><House size={18} weight="bold"/>Home</button>
-          <button className={modal==='new'?'nav-active':''} onClick={()=>{setNewTitle('');setModal('new');setSidebar(false);}} disabled={busy}><Target size={18} weight="bold"/>New Mission</button>
+          <button className={!missionId&&!modal?'nav-active':''} disabled={busy} onClick={()=>void goHome()}><House size={18} weight="bold"/>Home</button>
+          <button className={modal==='new'?'nav-active':''} onClick={()=>void goHome()} disabled={busy}><Target size={18} weight="bold"/>New Mission</button>
           <button className={modal==='saved'?'nav-active':''} onClick={()=>{setModal('saved');setSidebar(false);}}><ClockCounterClockwise size={18} weight="bold"/>Saved<span className="count">{missions.length}</span></button>
-          <button className={!modal&&tool==='vault'?'nav-active':''} onClick={()=>{setTool('vault');setModal(null);setSidebar(false);}}><Database size={18} weight="bold"/>ThinkVault</button>
-          <button className={modal==='sync'?'nav-active':''} onClick={()=>{setModal('sync');setSidebar(false);}}><FileCode size={18} weight="bold"/>Obsidian Sync</button>
+          <button className={!modal&&tool==='vault'?'nav-active':''} disabled={!missionId} onClick={()=>{setTool('vault');setModal(null);setSidebar(false);}}><Database size={18} weight="bold"/>ThinkVault</button>
+          <button className={modal==='sync'?'nav-active':''} disabled={!missionId} onClick={()=>{setModal('sync');setSidebar(false);}}><FileCode size={18} weight="bold"/>Obsidian Sync</button>
         </div>
         <div className="nav-actions">
           <span className="save-status"><CloudCheck size={16} weight="bold"/>{saveStatus}</span>
@@ -153,14 +164,15 @@ export default function ThinkBuddy({userName,guest=false}:{userName:string;guest
     </div>
     {sidebar&&<button className="nav-scrim" onClick={()=>setSidebar(false)} aria-label="Close navigation"/>}
     <main className="workspace">
-      <header className="hero">
+      {missionId&&<header className="hero">
         <h1 className="hero-title">THINKBUDDY</h1>
         <p className="hero-tagline">One Question. Many Perspectives. Better Thinking.</p>
-      </header>
+      </header>}
       <div className="workspace-content">
       {!live&&<div className="demo-notice"><span className="demo-chip"><Sparkle size={13} weight="fill"/>Demo</span><span>{guest?'Guest demo: explore without an account. Missions save in this browser.':'You are exploring a sample council. Live AI requires a configured server API key.'}</span><button onClick={()=>setModal('settings')}>Setup <ArrowUpRight size={13} weight="bold"/></button></div>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label="Dismiss error"><X size={17} weight="bold"/></button></div>}
-      {!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
+      {!missionId?<MissionLanding onStart={newMission} onOpen={openMission} missions={missions} busy={busy} ready={ready}/>:!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
+        <div className="mission-page-actions"><button className="text-button" disabled={busy} onClick={()=>void goHome()}><House size={17}/>Home</button><button className="primary-button" disabled={busy} onClick={()=>void goHome()}><Plus size={18}/>New Mission</button></div>
         <section className="mission-card">
           <span className="mission-symbol"><Target size={34} weight="bold"/></span>
           <div className="mission-text"><span className="mission-eyebrow">Current Mission</span><h2 title={mission.title}>“{mission.title}”</h2></div>
@@ -181,7 +193,7 @@ export default function ThinkBuddy({userName,guest=false}:{userName:string;guest
     </main>
     {notice&&<div className="toast" role="status"><Check size={17}/>{notice}</div>}
     {modal==='new'&&<Modal title="What would you like to think about?" onClose={()=>setModal(null)}><p className="dialog-intro">A decision, a big idea, or a small everyday question. Your council will meet you there.</p><form onSubmit={e=>{e.preventDefault();void newMission(newTitle);}}><label className="field-label" htmlFor="mission-title">Your mission</label><textarea autoFocus id="mission-title" rows={4} maxLength={1000} value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="I’ve been wondering…" required/><button className="primary-button full-width" disabled={!newTitle.trim()||busy}>Gather my council <ArrowRight size={18}/></button></form><span className="field-label examples-label">Or start with a little inspiration</span><div className="examples">{examples.map(e=><button key={e} onClick={()=>setNewTitle(e)}>{e}<ArrowUpRight size={14}/></button>)}</div></Modal>}
-    {modal==='saved'&&<Modal title="Your saved missions" onClose={()=>setModal(null)}><p className="dialog-intro">Pick up a thought where you left it.</p><div className="saved-list">{missions.map(m=><div key={m.id}><button onClick={()=>void openMission(m)}><strong>{m.title}</strong><small>{new Date(m.updatedAt).toLocaleDateString()} · {m.statements.length} contributions</small></button><button className="icon-button" aria-label={'Delete '+m.title} onClick={async()=>{if(!confirm('Delete this mission and its saved thinking? This cannot be undone.'))return;try{if(guest)deleteGuestMission(m.id);else await jsonRequest('/api/missions?id='+encodeURIComponent(m.id),{method:'DELETE'});setMissions(all=>all.filter(x=>x.id!==m.id));if(current.current?.id===m.id){const next=missions.find(x=>x.id!==m.id)||createDemoMission();setMission(next);current.current=next;}setNotice('Mission deleted.');}catch(e){setError((e as Error).message);}}}><Trash size={17}/></button></div>)}</div></Modal>}
+    {modal==='saved'&&<Modal title="Your saved missions" onClose={()=>setModal(null)}><p className="dialog-intro">Pick up a thought where you left it.</p><div className="saved-list">{missions.map(m=><div key={m.id}><button onClick={()=>void openMission(m)}><strong>{m.title}</strong><small>{new Date(m.updatedAt).toLocaleDateString()} · {m.statements.length} contributions</small></button><button className="icon-button" aria-label={'Delete '+m.title} onClick={async()=>{if(!confirm('Delete this mission and its saved thinking? This cannot be undone.'))return;try{if(guest)deleteGuestMission(m.id);else await jsonRequest('/api/missions?id='+encodeURIComponent(m.id),{method:'DELETE'});setMissions(all=>all.filter(x=>x.id!==m.id));if(current.current?.id===m.id){const next=missions.find(x=>x.id!==m.id)||createDemoMission();setMission(next);current.current=next;router.push('/');}setNotice('Mission deleted.');}catch(e){setError((e as Error).message);}}}><Trash size={17}/></button></div>)}</div></Modal>}
     {modal==='history'&&mission&&<Modal title="The thinking journey" onClose={()=>setModal(null)} wide><p className="dialog-intro">Every perspective, in the order it arrived. Select a contribution to look closer.</p><div className="history-list">{mission.statements.map(s=>{const m=mission.mascots.find(m=>m.id===s.mascotId);return <button key={s.id} onClick={()=>{setModal(null);setDetail(s);}}><Sprite index={m?.sprite||0}/><span><strong>{m?.name||'Former council member'}<small>{s.status}</small></strong><span>{s.text}</span></span></button>;})}</div></Modal>}
     {modal==='settings'&&<Modal title="Make yourself at home" onClose={()=>setModal(null)}><section className="settings-section"><h3>Appearance</h3><div className="theme-choices">{(['system','light','dark'] as const).map(t=><button className={theme===t?'chosen':''} onClick={()=>chooseTheme(t)} key={t}>{t}</button>)}</div></section><section className="settings-section"><h3>{guest?'Guest workspace':'OpenAI connection'} <span className="pill">{live?'Connected':'Not configured'}</span></h3><p>{guest?'You can explore without signing in. Guest discussions are simulated, and missions stay in this browser. Export important notes before clearing browser data.':live?'Your key is stored securely on the server.':'The workspace is in demo mode. Add OPENAI_API_KEY as a secret in the Site’s environment settings, then redeploy to enable live discussions, evidence retrieval, and transcription.'}</p><p>Your key is never entered into this page or stored in the browser.</p></section><section className="settings-section"><h3>About your council</h3><p>Your buddies are simulated AI perspectives, not real people or verified professionals. Their ideas are starting points for your judgment. Sources and uncertainty stay visible.</p><p>Reduced motion follows your device preference. Use Shift + arrow keys on a character to reposition it.</p></section>{!guest&&<a className="text-button signout" href="/signout-with-chatgpt?return_to=%2F" target="_top"><SignOut size={17}/>Sign out</a>}</Modal>}
     {syncMounted&&mission&&<Modal open={modal==='sync'} title="Your ideas, connected" onClose={()=>setModal(null)} wide><Suspense fallback={<p>Opening your vault tools…</p>}><SyncPanel mission={mission} onSave={async m=>{current.current=m;setMission(m);await save(m);}} onClose={()=>setModal(null)}/></Suspense></Modal>}
