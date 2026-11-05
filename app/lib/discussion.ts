@@ -1,8 +1,9 @@
-import type { Mission, Statement, CouncilQuestion, CouncilRequest } from './types';
+import type { Mission, Statement, CouncilQuestion, CouncilRequest, ReplyAttachment } from './types';
 
-export function addUserMessage(mission: Mission, text: string, questionIds: string[] = [], kind: 'message' | 'takeaway' = 'message'): Mission {
+export function addUserMessage(mission: Mission, text: string, questionIds: string[] = [], kind: 'message' | 'takeaway' = 'message', attachments:ReplyAttachment[]=[]): Mission {
   const stamp = new Date().toISOString();
-  return {...mission, messages:[...(mission.messages ?? []),{id:crypto.randomUUID(),text,kind,createdAt:stamp}], questions:(mission.questions ?? []).map(q=>questionIds.includes(q.id)?{...q,status:'answered' as const,answer:text,answeredAt:stamp}:q), updatedAt:stamp};
+  const answer=[text,...attachments.map(a=>`Attached ${a.name}: ${a.text}`)].join('\n\n').slice(0,16000);
+  return {...mission, messages:[...(mission.messages ?? []),{id:crypto.randomUUID(),text,kind,createdAt:stamp,...(attachments.length?{attachments}:{})}], questions:(mission.questions ?? []).map(q=>questionIds.includes(q.id)?{...q,status:'answered' as const,answer,answeredAt:stamp}:q), updatedAt:stamp};
 }
 
 export function mergeStatements(previous: Statement[], incoming: Statement[]): Statement[] {

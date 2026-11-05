@@ -1,0 +1,33 @@
+/* Restore the spacious mascot board while keeping the working result alongside it. */
+.discussion-workspace .conversation-heading h3{font-size:18px;letter-spacing:-.02em}
+.board-controls{display:flex;align-items:center;gap:9px}.board-controls .everyone{margin:0}
+.discussion-workspace .hover-council{border:0;box-shadow:none;border-radius:0;overflow:hidden;background:var(--panel);border-bottom:2px solid var(--ink)}
+.discussion-workspace .hover-council .stage-top{padding:12px 16px;background:var(--panel)}
+.discussion-workspace .hover-council .mascot-stage{gap:22px 18px;padding:22px 18px 16px;background:linear-gradient(180deg,var(--panel),var(--panel-deep))}
+.discussion-workspace .hover-council .stage-caption{border-radius:0;font-size:10px;padding:12px 16px}
+.discussion-workspace .hover-council .speech-bubble{min-height:98px;font-size:11px}
+.discussion-workspace .hover-council .mascot-body,.discussion-workspace .hover-council .mascot-body .sprite{width:108px;height:162px}
+.discussion-workspace .hover-council .mascot-role{font-size:10px}
+.discussion-workspace .hover-council .mascot-name{min-height:45px}
+.mascot-question-reply{font-size:9px;font-weight:800;background:var(--yellow);color:#111;border:1.5px solid var(--ink);border-radius:20px;padding:5px 9px;margin:2px 0 0}
+.board-conversation{border-top:1px solid var(--line);background:var(--surface)}
+.board-conversation>summary{display:flex;align-items:center;gap:8px;padding:13px 20px;font-size:11px;font-weight:800;cursor:pointer;list-style:none}
+.board-conversation>summary:before{content:'▸';font-size:12px}.board-conversation[open]>summary:before{content:'▾'}.board-conversation>summary span{font-size:9px;font-weight:500;color:var(--muted)}
+.board-conversation .conversation-feed{height:370px;min-height:220px;border-top:1px solid var(--line)}
+.mascot-inspector{position:fixed;z-index:1000;width:min(370px,calc(100vw - 24px));display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:2px solid var(--ink);border-radius:16px;box-shadow:6px 6px 0 var(--ink);overflow:hidden}
+.mascot-inspector>header{display:flex;align-items:center;gap:15px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.mascot-inspector header span{flex:1;min-width:0}.mascot-inspector header strong{font-size:15px;font-weight:850}.mascot-inspector header small{display:block;font-size:10px;color:var(--muted)}
+.mascot-inspector header button{font-size:22px;line-height:1;padding:5px;min-width:30px;min-height:30px}
+.mascot-inspector-body{padding:16px;overflow:auto;overscroll-behavior:contain;font-size:12px;line-height:1.75;min-height:0}
+.mascot-inspector-body h4{font-size:13px;margin:8px 0}.mascot-inspector-body p{white-space:pre-wrap;overflow-wrap:anywhere}.mascot-inspector-body p+p{margin-top:12px}
+.mascot-inspector-body a{display:block;font-size:11px;line-height:1.6;text-decoration:underline;overflow-wrap:anywhere;margin-top:9px}
+.inspector-question{padding:12px;margin-top:13px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}.inspector-question strong{font-size:10px}
+.mascot-inspector>footer{display:flex;gap:6px;flex-wrap:wrap;padding:12px;border-top:1px solid var(--line);flex-shrink:0}
+.mascot-inspector footer button{font-size:10px;font-weight:800;border:1.5px solid var(--ink);border-radius:7px;padding:7px 9px}.mascot-inspector footer button:first-child{background:var(--yellow);color:#111}
+.reply-attachments{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.reply-attachments>span{display:flex;align-items:center;gap:6px;max-width:100%;overflow-wrap:anywhere;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;font-size:11px;padding:7px}.reply-attachments button{display:grid;place-items:center;padding:3px}
+.attach-reply{width:29px;height:38px;min-width:29px;display:grid;place-items:center}
+.upload-help{font-size:9px;color:var(--muted);padding:0 20px 10px;line-height:1.7}
+.failed-reply{padding:10px 20px;font-size:11px;background:var(--accent-soft);display:flex;align-items:center;gap:9px;flex-wrap:wrap}.failed-reply button{font-size:10px;font-weight:800;text-decoration:underline}
+.message-attachment{margin-top:9px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface)}.message-attachment summary{font-size:11px;font-weight:750;cursor:pointer;display:flex;align-items:center;gap:5px}.message-attachment p{font-size:11px;max-height:260px;overflow:auto;margin-top:9px;white-space:pre-wrap}
+@media(max-width:767px){.discussion-workspace .conversation-heading{gap:9px;padding:13px 12px}.conversation-heading .panel-eyebrow{font-size:8px}.board-controls{gap:5px}.board-controls button{font-size:9px}.board-controls .everyone{padding:5px 7px}.discussion-workspace .hover-council .mascot-stage{gap:20px 12px;padding:18px 12px 14px}.discussion-workspace .hover-council .mascot-body,.discussion-workspace .hover-council .mascot-body .sprite{width:88px;height:132px}.discussion-workspace .hover-council .mascot-role{font-size:9px}.question-queue .queued-question{flex-wrap:wrap}.question-queue .queued-question label{min-width:100%}.queued-question>button{padding:6px 9px;border:1px solid var(--line);border-radius:5px}.mascot-inspector-body{font-size:13px}.mascot-inspector footer button{min-height:34px}.conversation-composer form{gap:4px}.upload-help{padding:0 12px 10px}}
+@media(prefers-reduced-motion:reduce){.mascot-inspector{scroll-behavior:auto}}

@@ -41,7 +41,7 @@ import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight'
 import { Lightning } from '@phosphor-icons/react/dist/csr/Lightning';
 import { createDemoMission, demoCouncil } from '../lib/demo';
 import { loadGuestMissions, saveGuestMission, deleteGuestMission } from '../lib/guest-store';
-import type { CouncilRequest, Mascot, Mission, MissionBrief, Statement, Tool } from '../lib/types';
+import type { CouncilRequest, Mascot, Mission, MissionBrief, Statement, Tool, ReplyAttachment } from '../lib/types';
 import MascotStage, { Sprite } from './MascotStage';
 const ToolsPanel = lazy(()=>import('./ToolsPanel'));
 const SyncPanel = lazy(()=>import('./SyncPanel'));
@@ -162,9 +162,9 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
       return false;
     }finally{busyRef.current=false;setBusy(false);setProgress({});abort.current=null;}
   }
-  async function sendCouncil(text:string,ids:string[],questions:string[]){
+  async function sendCouncil(text:string,ids:string[],questions:string[],attachments:ReplyAttachment[]=[]){
     if(busyRef.current||!current.current)return false;
-    const next=addUserMessage(current.current,text,questions);editVersion.current+=1;current.current=next;setMission(next);dirty.current=true;
+    const next=addUserMessage(current.current,text,questions,'message',attachments);editVersion.current+=1;current.current=next;setMission(next);dirty.current=true;
     const mentions=resolveMentions(text,next);return command('turn',text,next,mentions.length?mentions:ids);
   }
   async function discussCommand(action:CouncilRequest['action'],prompt='',ids?:string[]){

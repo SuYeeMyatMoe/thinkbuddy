@@ -10,16 +10,19 @@ import { Notebook } from '@phosphor-icons/react/dist/csr/Notebook';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { Sparkle } from '@phosphor-icons/react/dist/csr/Sparkle';
 import { X } from '@phosphor-icons/react/dist/csr/X';
-import { Sprite } from './MascotStage';
-import type { CouncilRequest, Mascot, Mission, Statement, Tool } from '../lib/types';
+import MascotStage, { Sprite } from './MascotStage';
+import { Paperclip } from '@phosphor-icons/react/dist/csr/Paperclip';
+import { UPLOAD_ACCEPT, validateUploads, extractPlainText, attachmentMime } from '../lib/attachments';
+import type { CouncilRequest, Mascot, Mission, Statement, Tool, ReplyAttachment } from '../lib/types';
 import './discussion.css';
+import './board.css';
 
 type View='discussion'|'result'|'notes'|'sources';
-type Reply={text:string;ids:string[];questions:string[]};
+type Reply={text:string;ids:string[];questions:string[];files:File[]};
 interface Props {
   mission:Mission;busy:boolean;live:boolean;saveStatus:string;progress:Record<string,string>;
   input:string;setInput:(v:string)=>void;recording:boolean;voiceBusy:boolean;onVoice:()=>void;
-  onSend:(text:string,ids:string[],questions:string[])=>Promise<unknown>;
+  onSend:(text:string,ids:string[],questions:string[],attachments?:ReplyAttachment[])=>Promise<unknown>;
   onCommand:(action:CouncilRequest['action'],prompt?:string,ids?:string[])=>Promise<unknown>;
   onChange:(m:Mission)=>void;onSave:(m:Mission)=>Promise<void>;onTakeaway:(text:string)=>Promise<void>;
   onPause:()=>void;onManage:(m:Mascot)=>void;onOpenTool:(t:Tool)=>void;
@@ -36,6 +39,10 @@ export default function CouncilWorkspace(p:Props){
   const feed=useRef<HTMLDivElement>(null),composer=useRef<HTMLTextAreaElement>(null),follow=useRef(true),sending=useRef(false);
   const [dispatching,setDispatching]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [files,setFiles]=useState<File[]>([]),[uploading,setUploading]=useState(false),[failedReply,setFailedReply]=useState<Reply|null>(null);
+  const filePicker=useRef<HTMLInputElement>(null);
+  const alive=useRef(true),uploadAbort=useRef<AbortController|null>(null);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;uploadAbort.current?.abort();};},[]);
   const openQuestions=(mission.questions??[]).filter(q=>q.status==='open');
   const answered=(mission.questions??[]).filter(q=>q.status!=='open');
   const result=mission.result;
@@ -45,16 +52,49 @@ export default function CouncilWorkspace(p:Props){
   useEffect(()=>{
     if(busy||dispatching||sending.current||!queue.length)return;
     const [next,...rest]=queue;sending.current=true;setDispatching(true);setQueue(rest);
-    void p.onSend(next.text,next.ids,next.questions).finally(()=>{sending.current=false;setDispatching(false);});
+    void deliver(next).finally(()=>{sending.current=false;setDispatching(false);});
   },[busy,dispatching,queue,p.onSend]);
+  async function deliver(next:Reply){
+    try{
+      let attachments:ReplyAttachment[]=[];
+      if(next.files.length){
+        setUploading(true);setFeedback('Reading your attachments…');
+        if(!live){attachments=await Promise.all(next.files.map(async file=>extractPlainText(file.name,new Uint8Array(await file.arrayBuffer()))));}
+        else{
+          const form=new FormData();next.files.forEach(file=>form.append('files',file));
+          form.append('question',[next.text,...(mission.questions??[]).filter(q=>next.questions.includes(q.id)).map(q=>q.text)].join('\n'));
+          uploadAbort.current=new AbortController();
+          const response=await fetch('/api/attachments',{method:'POST',body:form,signal:uploadAbort.current.signal});
+          const data=await response.json() as {attachments?:ReplyAttachment[];error?:string};
+          if(!response.ok||!data.attachments?.length)throw Error(data.error||'The files could not be read. Try again.');
+          attachments=data.attachments;
+        }
+        setUploading(false);setFeedback('Attachments read. Your council is using them in this reply.');
+      }
+      if(!alive.current)return;
+      await p.onSend(next.text,next.ids,next.questions,attachments);if(alive.current)setFailedReply(null);
+    }catch(e){if(alive.current){setFailedReply(next);setFeedback(e instanceof Error?e.message:'The attachment could not be read. Your files are available to retry.');}}
+    finally{if(alive.current)setUploading(false);uploadAbort.current=null;}
+  }
+  function chooseFiles(list:FileList|null){
+    if(!list?.length)return;
+    try{const next=[...files,...Array.from(list)];validateUploads(next);
+      if(!live&&next.some(f=>!attachmentMime(f.name).startsWith('text/')&&attachmentMime(f.name)!=='application/json'))throw Error('PDF and image reading requires live AI. Text, Markdown, CSV and JSON work in demo mode.');
+      setFiles(next);setFeedback('Files selected. They will be read when you send your reply.');
+    }catch(e){setFeedback((e as Error).message);}finally{if(filePicker.current)filePicker.current.value='';}
+  }
+  function stageReply(id:string,upload=false){
+    const ids=openQuestions.filter(q=>q.mascotId===id).map(q=>q.id);setTargets(ids.length?[]:[id]);answer(ids);
+    if(upload)filePicker.current?.click();
+  }
   function showSide(next:Exclude<View,'discussion'>){setSide(next);setView(next);}
   function evidence(s:Statement){setSelectedClaim(s.id);showSide('sources');}
   async function submit(text=p.input){
-    if(!text.trim())return;
-    const next={text:text.trim(),ids:targets,questions:answerIds};
+    if((!text.trim()&&!files.length)||uploading)return;
+    const next={text:text.trim()||'I attached supporting material for this question.',ids:targets,questions:answerIds,files};
     if(busy||sending.current){if(queue.length>=5)return;setQueue(q=>[...q,next]);}
-    else {sending.current=true;setDispatching(true);void p.onSend(next.text,next.ids,next.questions).finally(()=>{sending.current=false;setDispatching(false);});}
-    p.setInput('');setAnswerIds([]);follow.current=true;
+    else {sending.current=true;setDispatching(true);void deliver(next).finally(()=>{sending.current=false;setDispatching(false);});}
+    p.setInput('');setFiles([]);setAnswerIds([]);follow.current=true;
   }
   function answer(ids:string[]){setAnswerIds(ids);setView('discussion');composer.current?.focus();}
   function questionState(id:string,status:'open'|'skipped'){
@@ -67,18 +107,18 @@ export default function CouncilWorkspace(p:Props){
   const activeSources=selectedClaim?mission.statements.filter(s=>s.id===selectedClaim):mission.statements.filter(s=>s.sources.length||s.evidenceReview);
 
   return <div className="discussion-workspace">
-    <header className="council-presence">
-      <div className="presence-title"><span className="presence-dot"/><strong>Your council</strong><span className="workspace-label">{live?'Live AI':'Demo perspectives'}</span><button onClick={()=>setTargets([])} className={!targets.length?'everyone selected':'everyone'} aria-pressed={!targets.length}>Everyone</button><button className="invite-perspective" disabled={busy||mission.mascots.length>=6} onClick={()=>void p.onCommand("replace","Add a missing perspective that contributes something different to this mission.")}>+ Invite</button></div>
-      <div className="companion-strip" aria-label="Choose who receives your message">{mission.mascots.map(m=><div className={'companion-slot '+(targets.includes(m.id)?'targeted':'')} key={m.id}><button className="companion-select" onClick={()=>setTargets(t=>t.includes(m.id)?t.filter(id=>id!==m.id):[...t,m.id])} aria-pressed={targets.includes(m.id)} aria-label={'Talk to '+m.name}><Sprite index={m.sprite}/><span><strong>{m.name}</strong><small title={m.role}>{m.role}</small><span className={'companion-state '+(p.progress[m.id]?'working':'')}>{statusFor(m)}</span></span></button><button className="companion-settings" disabled={busy} onClick={()=>p.onManage(m)} aria-label={'Manage '+m.name}>···</button></div>)}</div>
-    </header>
+
     <div className="workspace-switcher" aria-label="Workspace views">{(['discussion','result','notes','sources'] as View[]).map(v=><button key={v} aria-pressed={view===v} onClick={()=>{setView(v);if(v!=='discussion')setSide(v);}}>{v==='discussion'?'Conversation':v==='result'?'Result':v==='notes'?`Notes ${mission.notes.length}`:`Sources ${sourceCount}`}</button>)}</div>
     <div className={'conversation-layout mobile-view-'+view}>
       <section className="conversation-panel" aria-label="Council conversation">
-        <div className="conversation-heading"><div><span className="panel-eyebrow">THINK TOGETHER</span><h3>Let’s work it out.</h3></div><span className="round-pill">Round {mission.round}</span></div>
+        <div className="conversation-heading"><div><span className="panel-eyebrow">ONE QUESTION. MANY PERSPECTIVES.</span><h3>The Council <span className="workspace-label">{live?'Live AI':'Demo'}</span></h3></div><div className="board-controls"><button className={!targets.length?'everyone selected':'everyone'} onClick={()=>setTargets([])}>Everyone</button><button className="invite-perspective" disabled={busy||mission.mascots.length>=6} onClick={()=>void p.onCommand('replace','Add a missing perspective that contributes something different to this mission.')}>+ Invite buddy</button></div></div>
+        <MascotStage mission={mission} selected={targets} onSelect={id=>setTargets(t=>t.includes(id)?t.filter(x=>x!==id):[...t,id])} busy={busy} active={Object.keys(p.progress)[0]??null} progress={p.progress} onDetail={evidence} onManage={p.onManage} onReply={id=>stageReply(id)} onUpload={id=>stageReply(id,true)} onEvidence={evidence}/>
+        <details className="board-conversation"><summary>Discussion history <span>{entries.length} messages</span>{busy&&<span> · Council responding…</span>}</summary>
+
         <div className="conversation-feed" ref={feed} role="log" aria-label="Discussion messages" aria-live="polite" aria-relevant="additions" onScroll={()=>{const el=feed.current;if(el)follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<100;}}>
           {!entries.length&&<div className="conversation-empty"><Sprite index={0}/><h4>Your council is gathering.</h4><p>Ask a question or tell us what matters. Replies will appear here.</p></div>}
           {entries.map(entry=>{
-            if(entry.kind==='user')return <article className="conversation-message user-message" key={entry.id}><span className="message-byline">You{entry.message.kind==='takeaway'?' · Saved takeaway':''}</span><p>{entry.message.text}</p></article>;
+            if(entry.kind==='user')return <article className="conversation-message user-message" key={entry.id}><span className="message-byline">You{entry.message.kind==='takeaway'?' · Saved takeaway':''}</span><p>{entry.message.text}</p>{entry.message.attachments?.map(file=><details className="message-attachment" key={file.id}><summary><Paperclip size={13}/>{file.name} · {file.truncated?'Excerpt':'Read content'}</summary><p>{file.text}</p></details>)}</article>;
             const s=entry.statement,m=mission.mascots.find(m=>m.id===s.mascotId);
             return <article className={'conversation-message companion-message '+(s.mascotId==='buddy'?'buddy-message':'')} key={s.id} style={{'--companion-color':m?.color??'#669A89'} as React.CSSProperties}>
               <div className="message-top"><span className="message-avatar"><Sprite index={m?.sprite??0}/></span><div><strong>{m?.name??'Previous companion'}</strong><small>{m?.role??'Earlier perspective'}</small></div><span className={'evidence-label evidence-'+s.status.toLowerCase().replaceAll(' ','-')}>{s.status}</span></div>
@@ -91,12 +131,13 @@ export default function CouncilWorkspace(p:Props){
           })}
           {busy&&<div className="conversation-progress" role="status"><span className="typing-dots"><i/><i/><i/></span><span>{Object.values(p.progress).includes('Checking sources')?'Checking sources. You can keep writing.':'Your council is working. Replies appear as they arrive.'}</span><button onClick={p.onPause}><Pause size={14}/>Pause</button></div>}
         </div>
-        {!!openQuestions.length&&<section className="question-queue" aria-label="Questions for you"><div className="question-queue-heading"><strong>{openQuestions.length} {openQuestions.length===1?'question':'questions'} for you</strong><button onClick={()=>answer(openQuestions.map(q=>q.id))}>Answer together</button></div>{(showQuestions?openQuestions:openQuestions.slice(0,2)).map(q=><div className={'queued-question '+(answerIds.includes(q.id)?'answering':'')} key={q.id}><label><input type="checkbox" checked={answerIds.includes(q.id)} onChange={e=>setAnswerIds(ids=>e.target.checked?[...ids,q.id]:ids.filter(id=>id!==q.id))}/><span><strong>{mission.mascots.find(m=>m.id===q.mascotId)?.name??'Companion'} asks</strong>{q.text}</span></label><button onClick={()=>answer([q.id])}>Reply</button><button disabled={busy} onClick={()=>questionState(q.id,'skipped')} aria-label={'Skip question: '+q.text}>Skip</button></div>)}{openQuestions.length>2&&<button className="question-more" onClick={()=>setShowQuestions(!showQuestions)}>{showQuestions?'Show fewer':'Show all questions'}</button>}</section>}
+        </details>
+        {!!openQuestions.length&&<section className="question-queue" aria-label="Questions for you"><div className="question-queue-heading"><strong>{openQuestions.length} {openQuestions.length===1?'question':'questions'} for you</strong><button onClick={()=>answer(openQuestions.map(q=>q.id))}>Answer together</button></div>{(showQuestions?openQuestions:openQuestions.slice(0,2)).map(q=><div className={'queued-question '+(answerIds.includes(q.id)?'answering':'')} key={q.id}><label><input type="checkbox" checked={answerIds.includes(q.id)} onChange={e=>setAnswerIds(ids=>e.target.checked?[...ids,q.id]:ids.filter(id=>id!==q.id))}/><span><strong>{mission.mascots.find(m=>m.id===q.mascotId)?.name??'Companion'} asks</strong>{q.text}</span></label><button onClick={()=>answer([q.id])}>Reply</button><button onClick={()=>{answer([q.id]);filePicker.current?.click();}}>Upload answer</button><button disabled={busy} onClick={()=>questionState(q.id,'skipped')} aria-label={'Skip question: '+q.text}>Skip</button></div>)}{openQuestions.length>2&&<button className="question-more" onClick={()=>setShowQuestions(!showQuestions)}>{showQuestions?'Show fewer':'Show all questions'}</button>}</section>}
         {!!answered.length&&<details className="answered-questions"><summary>{answered.length} answered or skipped questions · review mapping</summary>{answered.slice(-8).map(q=><div key={q.id}><strong>{q.status==='answered'?'Answered':'Skipped'}: {q.text}</strong>{q.answer&&<p>Your answer: {q.answer}</p>}<button disabled={busy} onClick={()=>questionState(q.id,'open')}>Reopen question</button></div>)}</details>}
         {!!queue.length&&<div className="pending-replies" aria-label="Queued messages">{queue.map((q,i)=><div key={i}><span>Next message: {q.text}</span><button onClick={()=>setQueue(all=>all.filter((_,j)=>j!==i))} aria-label="Remove queued message"><X size={14}/></button></div>)}</div>}
-        <div className="conversation-composer"><div className="composer-recipient"><span>{targets.length?'To '+mission.mascots.filter(m=>targets.includes(m.id)).map(m=>m.name).join(', '):'To the whole council'}</span><small>{answerIds.length?`Answering ${answerIds.length} selected questions`:'Use @name to address a companion'}</small></div><form onSubmit={e=>{e.preventDefault();void submit();}}><button type="button" className="voice-button" disabled={p.voiceBusy} onClick={p.onVoice} aria-label={p.recording?'Stop recording':'Record a voice question'}>{p.recording?<Stop size={21}/>:<Microphone size={21}/>}</button><label className="sr-only" htmlFor="council-message">Message the council</label><textarea id="council-message" ref={composer} value={p.input} maxLength={16000} onChange={e=>p.setInput(e.target.value)} rows={2} placeholder="Ask a question, answer your council, or add what you know…" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();void submit();}}}/><button className="send-button" aria-label={busy?'Queue message':'Send to council'} disabled={!p.input.trim()||queue.length>=5}><PaperPlaneRight size={21} weight="fill"/></button></form><div className="composer-footnote"><span>{p.voiceBusy?'Transcribing…':p.recording?'Recording…':busy?'Send now to queue your next message.':'Enter to send · Shift + Enter for a new line'}</span><button onClick={()=>{setTakeaway(mission.reflection);setTakeawayOpen(!takeawayOpen);}}>Save a takeaway</button></div></div>
+        <div className="conversation-composer"><input ref={filePicker} type="file" accept={UPLOAD_ACCEPT} multiple hidden aria-label="Attach files to your reply" onChange={e=>chooseFiles(e.target.files)}/>{!!files.length&&<div className="reply-attachments">{files.map((file,i)=><span key={i}><Paperclip size={13}/>{file.name}<button type="button" aria-label={'Remove attachment '+file.name} onClick={()=>setFiles(all=>all.filter((_,j)=>i!==j))}><X size={13}/></button></span>)}</div>}<div className="composer-recipient"><span>{targets.length?'To '+mission.mascots.filter(m=>targets.includes(m.id)).map(m=>m.name).join(', '):'To the whole council'}</span><small>{answerIds.length?`Answering ${answerIds.length} selected questions`:'Use @name to address a companion'}</small></div><form onSubmit={e=>{e.preventDefault();void submit();}}><button type="button" className="attach-reply" disabled={uploading||files.length>=3} onClick={()=>filePicker.current?.click()} aria-label="Attach supporting files" title="Attach PDF, image or text"><Paperclip size={21}/></button><button type="button" className="voice-button" disabled={p.voiceBusy} onClick={p.onVoice} aria-label={p.recording?'Stop recording':'Record a voice question'}>{p.recording?<Stop size={21}/>:<Microphone size={21}/>}</button><label className="sr-only" htmlFor="council-message">Message the council</label><textarea id="council-message" ref={composer} value={p.input} maxLength={16000} onChange={e=>p.setInput(e.target.value)} rows={2} placeholder="Ask a question, answer your council, or add what you know…" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();void submit();}}}/><button className="send-button" aria-label={busy?'Queue message':'Send to council'} disabled={uploading||(!p.input.trim()&&!files.length)||queue.length>=5}><PaperPlaneRight size={21} weight="fill"/></button></form><div className="composer-footnote"><span>{uploading?'Reading attachments…':p.voiceBusy?'Transcribing…':p.recording?'Recording…':busy?'Send now to queue your next message.':'Enter to send · Shift + Enter for a new line'}</span><button onClick={()=>{setTakeaway(mission.reflection);setTakeawayOpen(!takeawayOpen);}}>Save a takeaway</button></div></div>
         {takeawayOpen&&<div className="takeaway-editor"><label>What do you think now?<textarea value={takeaway} maxLength={16000} onChange={e=>setTakeaway(e.target.value)} placeholder="What changed your mind? What would you like to do?"/></label><button className="primary-button" disabled={busy||saving||!takeaway.trim()} onClick={()=>void saveTakeaway()}><Check size={16}/>Save takeaway</button><p>Saved separately from planning. It becomes context for the next reply.</p></div>}
-        {feedback&&<p className="workspace-feedback" role="status">{feedback}</p>}
+        {feedback&&<p className="workspace-feedback" role="status">{feedback}</p>}{failedReply&&<div className="failed-reply"><span>Your upload reply is ready to retry.</span><button disabled={busy||uploading||dispatching} onClick={()=>{sending.current=true;setDispatching(true);void deliver(failedReply).finally(()=>{sending.current=false;setDispatching(false);});}}>Retry upload reply</button><button onClick={()=>setFailedReply(null)}>Dismiss</button></div>}<p className="upload-help">Up to 3 files · 5 MB each · 10 MB total · PDF, images or text. Saved replies keep extracted content; original files are not stored.</p>
         <div className="conversation-shortcuts"><button disabled={busy} onClick={()=>void p.onCommand('turn','Summarize our current answer, the main disagreement, and the next useful step.',['buddy'])}>Summarize so far</button><button disabled={busy} onClick={()=>void p.onCommand('turn','Explore a meaningfully different option and compare its trade-offs.')}>Another option</button>{tools.map(([id,label])=><button key={id} onClick={()=>p.onOpenTool(id)}>{label}</button>)}</div>
       </section>
       <aside className="result-panel" aria-label="Mission results and resources"><div className="result-tabs" aria-label="Result views">{(['result','notes','sources'] as const).map(t=><button key={t} aria-pressed={side===t} onClick={()=>showSide(t)}>{t==='result'?'Result':t==='notes'?`Notes (${mission.notes.length})`:`Sources (${sourceCount})`}</button>)}</div><div className="result-content">

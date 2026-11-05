@@ -3,6 +3,7 @@ import { z } from 'zod';
 const short = z.string().max(500);
 const identifier = z.string().min(1).max(100);
 const stamp = z.string().datetime();
+export const attachmentSchema=z.object({id:identifier,name:z.string().min(1).max(200),mime:z.string().max(100),size:z.number().int().min(1).max(5*1024*1024),text:z.string().min(1).max(12000),truncated:z.boolean().optional()});
 export const sourceSchema = z.object({ title: short, url: z.string().url().max(2048).refine(s => /^https?:\/\//.test(s), 'Only HTTP sources are allowed'), publisher: short.optional(), publishedAt: z.string().max(100).optional(), summary: z.string().max(2000).optional() });
 export const mascotSchema = z.object({ id: identifier, name: z.string().min(1).max(60), role: short, personality: short, motivation: short, color: z.string().regex(/^#[0-9a-fA-F]{6}$/), sprite: z.number().int().min(0).max(5) });
 export const statementSchema = z.object({ id: identifier, mascotId: identifier, text: z.string().min(1).max(500), detail: z.string().max(16000), status: z.enum(['Supported', 'Partially Supported', 'Contested', 'Unverified', 'Assumption', 'Opinion', 'Prediction']), sources: z.array(sourceSchema).max(20), createdAt: stamp, question: short.optional(), evidenceReview: z.object({explanation:z.string().max(16000),limitations:z.string().max(4000),checkedAt:stamp}).optional() });
@@ -15,7 +16,7 @@ export const missionSchema = z.object({
   nodes: z.array(z.object({ id: identifier, label: z.string().max(4000), x: z.number().finite(), y: z.number().finite(), type: short, statementId: identifier.optional() })).max(1000),
   edges: z.array(z.object({ id: identifier, source: identifier, target: identifier, label: short })).max(2000),
   reflection: z.string().max(16000), round: z.number().int().min(0).max(10000), revision: z.number().int().min(0), createdAt: stamp, updatedAt: stamp,
-  messages:z.array(z.object({id:identifier,text:z.string().max(16000),createdAt:stamp,kind:z.enum(['message','takeaway'])})).max(1000).optional(),
+  messages:z.array(z.object({id:identifier,text:z.string().max(16000),createdAt:stamp,kind:z.enum(['message','takeaway']),attachments:z.array(attachmentSchema).max(3).optional()})).max(1000).optional(),
   questions:z.array(z.object({id:identifier,mascotId:identifier,text:short,status:z.enum(['open','answered','skipped']),answer:z.string().max(16000).optional(),answeredAt:stamp.optional()})).max(500).optional(),
   brief:z.object({success:z.string().max(2000),audience:z.string().max(2000),resources:z.string().max(2000),deadline:z.string().max(100)}).optional(),
   result:z.object({summary:z.string().max(4000),recommendation:z.string().max(4000),changed:z.string().max(4000),unresolved:z.array(short).max(8),nextStep:z.string().max(2000),options:z.array(z.object({name:short,benefit:z.string().max(2000),cost:short.optional(),effort:short,risk:z.string().max(2000),evidenceGap:z.string().max(2000)})).max(3),experiment:z.object({action:z.string().max(2000),owner:short,successMeasure:z.string().max(2000),reviewDate:z.string().max(100)}),updatedAt:stamp}).optional(),

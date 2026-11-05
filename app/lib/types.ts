@@ -4,7 +4,8 @@ export interface Mascot { id: string; name: string; role: string; personality: s
 export interface Source { title: string; url: string; publisher?: string; publishedAt?: string; summary?: string; }
 export interface Statement { id: string; mascotId: string; text: string; detail: string; status: EvidenceStatus; sources: Source[]; createdAt: string; question?: string; evidenceReview?: { explanation: string; limitations: string; checkedAt: string }; }
 export interface Note { id: string; title: string; content: string; updatedAt: string; statementId?: string; origin?: 'automatic' | 'user'; theme?: string; }
-export interface ConversationMessage { id: string; text: string; createdAt: string; kind: 'message' | 'takeaway'; }
+export interface ReplyAttachment { id: string; name: string; mime: string; size: number; text: string; truncated?: boolean; }
+export interface ConversationMessage { id: string; text: string; createdAt: string; kind: 'message' | 'takeaway'; attachments?: ReplyAttachment[]; }
 export interface CouncilQuestion { id: string; mascotId: string; text: string; status: 'open' | 'answered' | 'skipped'; answer?: string; answeredAt?: string; }
 export interface MissionBrief { success: string; audience: string; resources: string; deadline: string; }
 export interface MissionResult { summary: string; recommendation: string; changed: string; unresolved: string[]; nextStep: string; options: { name: string; benefit: string; cost?: string; effort: string; risk: string; evidenceGap: string }[]; experiment: { action: string; owner: string; successMeasure: string; reviewDate: string }; updatedAt: string; }

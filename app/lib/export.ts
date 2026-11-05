@@ -43,6 +43,7 @@ export function missionMarkdown(mission: Mission): string {
   const parts = ['---', `title: ${scalar(mission.title)}`, `thinkbuddy_mission: ${scalar(mission.id)}`, `updated: ${scalar(mission.updatedAt)}`, 'tags: [thinkbuddy, mission]', '---', '', `# ${mission.title}`, '', '## Perspectives', ...mission.mascots.map(m => `- **${m.name} (${m.role})**: ${m.motivation}`), '', '## Discussion'];
   if(mission.brief)parts.push('', '## Mission brief', `Success: ${mission.brief.success}`, `People affected: ${mission.brief.audience}`, `Resources: ${mission.brief.resources}`, `Deadline: ${mission.brief.deadline}`);
   if(mission.messages?.length)parts.push('', '## Your contributions',...mission.messages.flatMap(m=>['',`### ${m.kind==='takeaway'?'Saved takeaway':'Message'} (${m.createdAt})`,m.text]));
+  for(const message of mission.messages??[])for(const attachment of message.attachments??[])parts.push('',`### Attached material: ${attachment.name}`,`${attachment.mime}; ${attachment.size} bytes; ${attachment.truncated?'excerpt':'extracted content'}`,'',attachment.text);
   for (const s of mission.statements) {
     parts.push('', `### ${mission.mascots.find(m => m.id === s.mascotId)?.name || s.mascotId}`, s.text, '', s.detail, '', `Evidence: ${s.status}`);
     for (const source of s.sources) { if (/^https?:\/\//i.test(source.url)) parts.push(`- [${source.title.replace(/[\[\]]/g, '')}](${encodeURI(source.url).replace(/[()]/g, encodeURIComponent)})`); }
