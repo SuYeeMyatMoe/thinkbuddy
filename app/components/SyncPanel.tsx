@@ -1,6 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowClockwise, FolderOpen, LinkBreak, DownloadSimple, UploadSimple, Warning } from '@phosphor-icons/react';
+import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { FolderOpen } from '@phosphor-icons/react/dist/csr/FolderOpen';
+import { LinkBreak } from '@phosphor-icons/react/dist/csr/LinkBreak';
+import { DownloadSimple } from '@phosphor-icons/react/dist/csr/DownloadSimple';
+import { UploadSimple } from '@phosphor-icons/react/dist/csr/UploadSimple';
+import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
 import type { Mission } from '../lib/types';
 import { connectVault, restoreVault, reconnectVault, disconnectVault, supportsVaultSync, syncVault, type SyncConflict, type SyncResolution } from '../lib/vault-sync';
 import { downloadFile, exportMissionZip, importNotes, safeFileName } from '../lib/export';

@@ -1,7 +1,42 @@
 'use client';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, ArrowRight, Plus, ClockCounterClockwise, CaretRight, CaretDown, Graph, ShieldCheck, Flask, Notebook, Path, Microphone, Stop, Sparkle, X, Play, Pause, Sun, Moon, CloudCheck, Trash, ArrowClockwise, ChatCircleDots, Lightbulb, Check, PencilSimple, Leaf, SignOut, House, Target, Database, FileCode, List, PaperPlaneRight, Lightning } from '@phosphor-icons/react';
-import { createDemoMission } from '../lib/demo';
+import { ArrowUpRight } from '@phosphor-icons/react/dist/csr/ArrowUpRight';
+import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
+import { ClockCounterClockwise } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
+import { CaretRight } from '@phosphor-icons/react/dist/csr/CaretRight';
+import { CaretDown } from '@phosphor-icons/react/dist/csr/CaretDown';
+import { Graph } from '@phosphor-icons/react/dist/csr/Graph';
+import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
+import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
+import { Notebook } from '@phosphor-icons/react/dist/csr/Notebook';
+import { Path } from '@phosphor-icons/react/dist/csr/Path';
+import { Microphone } from '@phosphor-icons/react/dist/csr/Microphone';
+import { Stop } from '@phosphor-icons/react/dist/csr/Stop';
+import { Sparkle } from '@phosphor-icons/react/dist/csr/Sparkle';
+import { X } from '@phosphor-icons/react/dist/csr/X';
+import { Play } from '@phosphor-icons/react/dist/csr/Play';
+import { Pause } from '@phosphor-icons/react/dist/csr/Pause';
+import { Sun } from '@phosphor-icons/react/dist/csr/Sun';
+import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
+import { CloudCheck } from '@phosphor-icons/react/dist/csr/CloudCheck';
+import { Trash } from '@phosphor-icons/react/dist/csr/Trash';
+import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { ChatCircleDots } from '@phosphor-icons/react/dist/csr/ChatCircleDots';
+import { Lightbulb } from '@phosphor-icons/react/dist/csr/Lightbulb';
+import { Check } from '@phosphor-icons/react/dist/csr/Check';
+import { PencilSimple } from '@phosphor-icons/react/dist/csr/PencilSimple';
+import { Leaf } from '@phosphor-icons/react/dist/csr/Leaf';
+import { SignOut } from '@phosphor-icons/react/dist/csr/SignOut';
+import { House } from '@phosphor-icons/react/dist/csr/House';
+import { Target } from '@phosphor-icons/react/dist/csr/Target';
+import { Database } from '@phosphor-icons/react/dist/csr/Database';
+import { FileCode } from '@phosphor-icons/react/dist/csr/FileCode';
+import { List } from '@phosphor-icons/react/dist/csr/List';
+import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight';
+import { Lightning } from '@phosphor-icons/react/dist/csr/Lightning';
+import { createDemoMission, demoCouncil } from '../lib/demo';
+import { loadGuestMissions, saveGuestMission, deleteGuestMission } from '../lib/guest-store';
 import type { CouncilRequest, Mascot, Mission, Statement, Tool } from '../lib/types';
 import MascotStage, { Sprite } from './MascotStage';
 const ToolsPanel = lazy(()=>import('./ToolsPanel'));
@@ -23,7 +58,7 @@ function Modal({title,onClose,children,wide=false,open=true}:{title:string;onClo
 interface ApiResult { error?: string; mission: Mission; missions: Mission[]; live: boolean; text: string; }
 async function jsonRequest(url:string,init?:RequestInit):Promise<ApiResult>{const r=await fetch(url,init);const data=await r.json() as ApiResult;if(!r.ok)throw new Error(data.error||'Request failed ('+r.status+')');return data;}
 
-export default function ThinkBuddy({userName}:{userName:string}){
+export default function ThinkBuddy({userName,guest=false}:{userName:string;guest?:boolean}){
   const [mission,setMission]=useState<Mission|null>(null),[missions,setMissions]=useState<Mission[]>([]);
   const [live,setLive]=useState(false),[tool,setTool]=useState<Tool|null>(null),[selected,setSelected]=useState<string[]>([]);
   const [input,setInput]=useState(''),[busy,setBusy]=useState(false),[active,setActive]=useState<string|null>(null);
@@ -48,30 +83,34 @@ export default function ThinkBuddy({userName}:{userName:string}){
       setSaveStatus('Saving');
       try{
         const old=current.current?.id===next.id?current.current:null,revision=Math.max(next.revision,old?.revision??0);
-        const result=await jsonRequest('/api/missions',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({mission:{...next,revision},expectedRevision:revision})});
+        const result=guest?{mission:saveGuestMission({...next,revision})}:await jsonRequest('/api/missions',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({mission:{...next,revision},expectedRevision:revision})});
         const saved=result.mission as Mission;
         if(current.current?.id===saved.id){const updated={...current.current,revision:saved.revision};current.current=updated;setMission(updated);}
-        setMissions(all=>[saved,...all.filter(m=>m.id!==saved.id)]);setSaveStatus('All changes saved');dirty.current=false;
+        setMissions(all=>[saved,...all.filter(m=>m.id!==saved.id)]);setSaveStatus(guest?'Saved in this browser':'All changes saved');dirty.current=false;
       }catch(e){setSaveStatus('Not saved');setError(e instanceof Error?e.message:'Could not save your mission.');throw e;}
     };
     const queued=saveQueue.current.then(task,task);saveQueue.current=queued.catch(()=>{});return queued;
-  },[]);
+  },[guest]);
   const edit=useCallback((next:Mission)=>{const updated={...next,updatedAt:new Date().toISOString()};current.current=updated;setMission(updated);dirty.current=true;setSaveStatus('Unsaved changes');if(debounce.current)clearTimeout(debounce.current);debounce.current=setTimeout(()=>{debounce.current=null;void save(updated).catch(()=>{});},700);},[save]);
   const flush=useCallback(async()=>{if(debounce.current){clearTimeout(debounce.current);debounce.current=null;if(current.current)await save(current.current);}await saveQueue.current;},[save]);
   useEffect(()=>{
     let disposed=false;
-    Promise.all([jsonRequest('/api/missions'),jsonRequest('/api/config')]).then(async([data,config])=>{
+    Promise.all(guest?[Promise.resolve().then(()=>({missions:loadGuestMissions()})),Promise.resolve({live:false})]:[jsonRequest('/api/missions'),jsonRequest('/api/config')]).then(async([data,config])=>{
       if(disposed)return;setLive(config.live);setMissions(data.missions);const m=data.missions[0]||createDemoMission();setMission(m);current.current=m;setSaveStatus(data.missions.length?'All changes saved':'Sample mission');
       if(!data.missions.length)await save(m);
     }).catch(e=>{if(!disposed){setError(e.message);setSaveStatus('Workspace unavailable');}});
     return()=>{disposed=true;abort.current?.abort();playback.current.forEach(clearTimeout);if(debounce.current)clearTimeout(debounce.current);if(voiceTimer.current)clearTimeout(voiceTimer.current);recorder.current?.stream.getTracks().forEach(t=>t.stop());};
-  },[save]);
+  },[save,guest]);
   useEffect(()=>{const guard=(e:BeforeUnloadEvent)=>{if(dirty.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[]);
   const highlight=(next:Mission)=>{playback.current.forEach(clearTimeout);next.mascots.forEach((m,i)=>playback.current.push(setTimeout(()=>setActive(m.id),i*2000)));playback.current.push(setTimeout(()=>setActive(null),next.mascots.length*2000));};
   async function command(action:CouncilRequest['action'],prompt='',base?:Mission,ids?:string[]){
     if(busy)return;const source=base||current.current;if(!source)return;setBusy(true);setError('');setPaused(false);abort.current=new AbortController();
     try{
       await flush();const fresh=base||current.current!;
+      if(guest){
+        const result=demoCouncil({action,mission:fresh,prompt,mascotIds:ids||selected});
+        current.current=result;setMission(result);setInput('');await save(result);highlight(result);return;
+      }
       const response=await fetch('/api/council',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action,mission:fresh,prompt,mascotIds:ids||selected}),signal:abort.current.signal});
       if(!response.ok){const e=await response.json() as {error?:string};throw new Error(e.error||'The council could not respond.');}
       const reader=response.body!.getReader(),decoder=new TextDecoder();let buffer='',result:Mission|null=null;
@@ -119,7 +158,7 @@ export default function ThinkBuddy({userName}:{userName:string}){
         <p className="hero-tagline">One Question. Many Perspectives. Better Thinking.</p>
       </header>
       <div className="workspace-content">
-      {!live&&<div className="demo-notice"><span className="demo-chip"><Sparkle size={13} weight="fill"/>Demo</span><span>You’re exploring a sample council. Add your API key in settings to bring your own questions to life.</span><button onClick={()=>setModal('settings')}>Setup <ArrowUpRight size={13} weight="bold"/></button></div>}
+      {!live&&<div className="demo-notice"><span className="demo-chip"><Sparkle size={13} weight="fill"/>Demo</span><span>{guest?'Guest demo: explore without an account. Missions save in this browser.':'You are exploring a sample council. Live AI requires a configured server API key.'}</span><button onClick={()=>setModal('settings')}>Setup <ArrowUpRight size={13} weight="bold"/></button></div>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label="Dismiss error"><X size={17} weight="bold"/></button></div>}
       {!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
         <section className="mission-card">
@@ -142,9 +181,9 @@ export default function ThinkBuddy({userName}:{userName:string}){
     </main>
     {notice&&<div className="toast" role="status"><Check size={17}/>{notice}</div>}
     {modal==='new'&&<Modal title="What would you like to think about?" onClose={()=>setModal(null)}><p className="dialog-intro">A decision, a big idea, or a small everyday question. Your council will meet you there.</p><form onSubmit={e=>{e.preventDefault();void newMission(newTitle);}}><label className="field-label" htmlFor="mission-title">Your mission</label><textarea autoFocus id="mission-title" rows={4} maxLength={1000} value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="I’ve been wondering…" required/><button className="primary-button full-width" disabled={!newTitle.trim()||busy}>Gather my council <ArrowRight size={18}/></button></form><span className="field-label examples-label">Or start with a little inspiration</span><div className="examples">{examples.map(e=><button key={e} onClick={()=>setNewTitle(e)}>{e}<ArrowUpRight size={14}/></button>)}</div></Modal>}
-    {modal==='saved'&&<Modal title="Your saved missions" onClose={()=>setModal(null)}><p className="dialog-intro">Pick up a thought where you left it.</p><div className="saved-list">{missions.map(m=><div key={m.id}><button onClick={()=>void openMission(m)}><strong>{m.title}</strong><small>{new Date(m.updatedAt).toLocaleDateString()} · {m.statements.length} contributions</small></button><button className="icon-button" aria-label={'Delete '+m.title} onClick={async()=>{if(!confirm('Delete this mission and its saved thinking? This cannot be undone.'))return;try{await jsonRequest('/api/missions?id='+encodeURIComponent(m.id),{method:'DELETE'});setMissions(all=>all.filter(x=>x.id!==m.id));if(current.current?.id===m.id){const next=missions.find(x=>x.id!==m.id)||createDemoMission();setMission(next);current.current=next;}setNotice('Mission deleted.');}catch(e){setError((e as Error).message);}}}><Trash size={17}/></button></div>)}</div></Modal>}
+    {modal==='saved'&&<Modal title="Your saved missions" onClose={()=>setModal(null)}><p className="dialog-intro">Pick up a thought where you left it.</p><div className="saved-list">{missions.map(m=><div key={m.id}><button onClick={()=>void openMission(m)}><strong>{m.title}</strong><small>{new Date(m.updatedAt).toLocaleDateString()} · {m.statements.length} contributions</small></button><button className="icon-button" aria-label={'Delete '+m.title} onClick={async()=>{if(!confirm('Delete this mission and its saved thinking? This cannot be undone.'))return;try{if(guest)deleteGuestMission(m.id);else await jsonRequest('/api/missions?id='+encodeURIComponent(m.id),{method:'DELETE'});setMissions(all=>all.filter(x=>x.id!==m.id));if(current.current?.id===m.id){const next=missions.find(x=>x.id!==m.id)||createDemoMission();setMission(next);current.current=next;}setNotice('Mission deleted.');}catch(e){setError((e as Error).message);}}}><Trash size={17}/></button></div>)}</div></Modal>}
     {modal==='history'&&mission&&<Modal title="The thinking journey" onClose={()=>setModal(null)} wide><p className="dialog-intro">Every perspective, in the order it arrived. Select a contribution to look closer.</p><div className="history-list">{mission.statements.map(s=>{const m=mission.mascots.find(m=>m.id===s.mascotId);return <button key={s.id} onClick={()=>{setModal(null);setDetail(s);}}><Sprite index={m?.sprite||0}/><span><strong>{m?.name||'Former council member'}<small>{s.status}</small></strong><span>{s.text}</span></span></button>;})}</div></Modal>}
-    {modal==='settings'&&<Modal title="Make yourself at home" onClose={()=>setModal(null)}><section className="settings-section"><h3>Appearance</h3><div className="theme-choices">{(['system','light','dark'] as const).map(t=><button className={theme===t?'chosen':''} onClick={()=>chooseTheme(t)} key={t}>{t}</button>)}</div></section><section className="settings-section"><h3>OpenAI connection <span className="pill">{live?'Connected':'Not configured'}</span></h3><p>{live?'Your key is stored securely on the server.':'The workspace is in demo mode. Add OPENAI_API_KEY as a secret in the Site’s environment settings, then redeploy to enable live discussions, evidence retrieval, and transcription.'}</p><p>Your key is never entered into this page or stored in the browser.</p></section><section className="settings-section"><h3>About your council</h3><p>Your buddies are simulated AI perspectives, not real people or verified professionals. Their ideas are starting points for your judgment. Sources and uncertainty stay visible.</p><p>Reduced motion follows your device preference. Use Shift + arrow keys on a character to reposition it.</p></section><a className="text-button signout" href="/signout-with-chatgpt?return_to=%2F" target="_top"><SignOut size={17}/>Sign out</a></Modal>}
+    {modal==='settings'&&<Modal title="Make yourself at home" onClose={()=>setModal(null)}><section className="settings-section"><h3>Appearance</h3><div className="theme-choices">{(['system','light','dark'] as const).map(t=><button className={theme===t?'chosen':''} onClick={()=>chooseTheme(t)} key={t}>{t}</button>)}</div></section><section className="settings-section"><h3>{guest?'Guest workspace':'OpenAI connection'} <span className="pill">{live?'Connected':'Not configured'}</span></h3><p>{guest?'You can explore without signing in. Guest discussions are simulated, and missions stay in this browser. Export important notes before clearing browser data.':live?'Your key is stored securely on the server.':'The workspace is in demo mode. Add OPENAI_API_KEY as a secret in the Site’s environment settings, then redeploy to enable live discussions, evidence retrieval, and transcription.'}</p><p>Your key is never entered into this page or stored in the browser.</p></section><section className="settings-section"><h3>About your council</h3><p>Your buddies are simulated AI perspectives, not real people or verified professionals. Their ideas are starting points for your judgment. Sources and uncertainty stay visible.</p><p>Reduced motion follows your device preference. Use Shift + arrow keys on a character to reposition it.</p></section>{!guest&&<a className="text-button signout" href="/signout-with-chatgpt?return_to=%2F" target="_top"><SignOut size={17}/>Sign out</a>}</Modal>}
     {syncMounted&&mission&&<Modal open={modal==='sync'} title="Your ideas, connected" onClose={()=>setModal(null)} wide><Suspense fallback={<p>Opening your vault tools…</p>}><SyncPanel mission={mission} onSave={async m=>{current.current=m;setMission(m);await save(m);}} onClose={()=>setModal(null)}/></Suspense></Modal>}
     {detail&&mission&&<Modal title={mission.mascots.find(m=>m.id===detail.mascotId)?.name||'Council contribution'} onClose={()=>setDetail(null)}><span className="pill">{detail.status}</span><h3 className="statement-title">{detail.text}</h3><p className="statement-detail">{detail.detail}</p>{detail.sources.map(s=><a className="source-link" key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">{s.title}<ArrowUpRight size={15}/></a>)}<div className="dialog-actions"><button className="secondary-button" onClick={()=>{edit({...mission,notes:[...mission.notes,{id:crypto.randomUUID(),title:detail.text.slice(0,80),content:detail.detail,statementId:detail.id,updatedAt:new Date().toISOString()}]});setNotice('Thought saved to ThinkVault.');setDetail(null);}}><Notebook size={17}/>Save thought</button><button className="primary-button" onClick={()=>{setSelected([detail.mascotId]);setInput('Can you explain or challenge this idea: '+detail.text);setDetail(null);}}><ChatCircleDots size={17}/>Explore further</button></div></Modal>}
     {manage&&mission&&<Modal title={'Get to know '+manage.name} onClose={()=>setManage(null)}><div className="character-profile"><Sprite index={manage.sprite}/><div><span className="pill">Simulated perspective</span><h3>{manage.role}</h3><p>{manage.personality}</p></div></div><label className="field-label">What matters to {manage.name}</label><p>{manage.motivation}</p><label className="field-label" htmlFor="perspective">Perspective</label><input id="perspective" value={manage.role} onChange={e=>setManage({...manage,role:e.target.value})}/><div className="dialog-actions"><button className="primary-button" onClick={()=>{edit({...mission,mascots:mission.mascots.map(m=>m.id===manage.id?manage:m)});setManage(null);}}>Save changes</button>{manage.id!=='buddy'&&<><button className="secondary-button" disabled={busy} onClick={()=>{void command('replace','Find an alternative to '+manage.role+'.',undefined,[manage.id]);setManage(null);}}><ArrowClockwise size={16}/>Replace</button><button className="icon-button" aria-label="Remove buddy" onClick={()=>{edit({...mission,mascots:mission.mascots.filter(m=>m.id!==manage.id)});setSelected(s=>s.filter(x=>x!==manage.id));setManage(null);}}><Trash size={18}/></button></>}</div></Modal>}

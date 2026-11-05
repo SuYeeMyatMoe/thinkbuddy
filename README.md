@@ -2,6 +2,8 @@
 
 A private, mascot-first thinking workspace built with React, Vinext, Sites, D1, Motion, and XYFlow.
 
+Public access: the homepage uses optional identity and opens without signing in when Site sharing is public. Anonymous visitors use a clearly labeled demo and store missions only in browser localStorage. Personal D1 mission APIs and paid OpenAI requests still require authentication. Guest data is not automatically uploaded or merged into an account. Clearing browser data removes guest missions; export notes to keep a copy.
+
 ## Run locally
 
 Use Node 22.13 or newer. Install dependencies with npm ci, then npm run dev. The local Sites preview supplies a development-only sign-in flow. Production uses ChatGPT sign-in.

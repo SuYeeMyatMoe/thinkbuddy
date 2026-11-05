@@ -1,7 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowSquareOut, Check, CheckSquare, FloppyDisk, Flask, GitBranch, LinkSimple, MagnifyingGlass, Plus, ShieldCheck, Trash, UploadSimple, X } from '@phosphor-icons/react';
+import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
+import { Check } from '@phosphor-icons/react/dist/csr/Check';
+import { CheckSquare } from '@phosphor-icons/react/dist/csr/CheckSquare';
+import { FloppyDisk } from '@phosphor-icons/react/dist/csr/FloppyDisk';
+import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
+import { GitBranch } from '@phosphor-icons/react/dist/csr/GitBranch';
+import { LinkSimple } from '@phosphor-icons/react/dist/csr/LinkSimple';
+import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
+import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
+import { Trash } from '@phosphor-icons/react/dist/csr/Trash';
+import { UploadSimple } from '@phosphor-icons/react/dist/csr/UploadSimple';
+import { X } from '@phosphor-icons/react/dist/csr/X';
 import { Background, Controls, ReactFlow, useNodesState, type Connection, type Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { ActionItem, Mission, Note, Tool } from '../lib/types';

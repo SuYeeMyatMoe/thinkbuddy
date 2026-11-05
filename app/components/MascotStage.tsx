@@ -1,7 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { DotsThree, HandWaving, ArrowCounterClockwise, ArrowsOut } from '@phosphor-icons/react';
+import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
+import { HandWaving } from '@phosphor-icons/react/dist/csr/HandWaving';
+import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
+import { ArrowsOut } from '@phosphor-icons/react/dist/csr/ArrowsOut';
 import type { Mascot, Mission, Statement } from '../lib/types';
 
 export function Sprite({index=0,className=''}:{index?:number;className?:string}) {

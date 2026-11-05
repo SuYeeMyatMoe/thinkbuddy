@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import ts from 'typescript';
 const base='http://127.0.0.1:5173';
+const publicPage=await fetch(base+'/',{redirect:'manual'});assert.equal(publicPage.status,200,'Public page must open without a sign-in redirect');
 const folder=new URL('../.cache/api-tests/',import.meta.url);await mkdir(folder,{recursive:true});
 await writeFile(new URL('demo.mjs',folder),ts.transpileModule(await readFile(new URL('../app/lib/demo.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText);
 const {createDemoMission}=await import(new URL('demo.mjs',folder));
