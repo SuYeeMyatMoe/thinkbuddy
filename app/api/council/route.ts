@@ -2,9 +2,10 @@ import { env } from 'cloudflare:workers';
 import { apiError, ApiError, database, readJson, requireApiUser } from '../../lib/server-api';
 import { councilRequestSchema, missionSchema } from '../../lib/server-validation';
 import { demoCouncil } from '../../lib/demo';
-import { liveCouncil } from '../../lib/server-ai';
+import { liveCouncil, type CouncilEmitter } from '../../lib/server-ai';
+import { demoWorkspace } from '../../lib/discussion';
 
-async function runCouncil(request: Request) {
+async function runCouncil(request: Request, emit?: CouncilEmitter, signal=request.signal) {
   let command: {owner:string;id:string}|undefined;
   try {
     const user=await requireApiUser(request);
@@ -23,7 +24,8 @@ async function runCouncil(request: Request) {
       }
       command={owner:user.userId,id:commandId};
     }
-    const mission=missionSchema.parse(env.OPENAI_API_KEY?await liveCouncil(req,request.signal):demoCouncil(req));
+    const mission=missionSchema.parse(env.OPENAI_API_KEY?await liveCouncil(req,signal,emit):demoWorkspace(req,demoCouncil(req)));
+    if(!env.OPENAI_API_KEY)for(const statement of mission.statements)emit?.('statement',{mascotId:statement.mascotId,statement,questions:mission.questions});
     const result={mission,demo:!env.OPENAI_API_KEY};
     if(command) await database().prepare('UPDATE council_commands SET result=? WHERE owner_id=? AND id=?').bind(JSON.stringify(result),command.owner,command.id).run();
     return Response.json(result);
@@ -37,26 +39,24 @@ export async function POST(request: Request) {
   if(!request.headers.get('accept')?.includes('text/event-stream')) return runCouncil(request);
   try { await requireApiUser(request); } catch(error) { return apiError(error); }
   const encoder=new TextEncoder();
+  const work=new AbortController();let cancelled=false;
+  const onAbort=()=>work.abort();request.signal.addEventListener('abort',onAbort,{once:true});
   const stream=new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit=(event:string,data:unknown)=>controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      const emit=(event:string,data:unknown)=>{if(!cancelled)controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));};
+      const heartbeat=setInterval(()=>{try{if(!cancelled)controller.enqueue(encoder.encode(': keep-alive\n\n'));}catch{work.abort();}},15000);
       try {
         emit('thinking',{id:crypto.randomUUID(),status:'thinking'});
-        const response=await runCouncil(request);
+        const response=await runCouncil(request,emit,work.signal);
         const result=await response.json() as {mission?:import('../../lib/types').Mission;demo?:boolean;error?:string};
         if(!response.ok) {emit('error',{error:result.error||'Discussion failed.',status:response.status});}
         else {
-          // Emit only validated statements; never expose incomplete JSON or unvalidated claims.
-          const mission=result.mission!;
-          for(const mascot of mission.mascots) {
-            const statement=mission.statements.filter(s=>s.mascotId===mascot.id).at(-1);
-            if(statement) emit('statement',{id:statement.id,missionId:mission.id,mascotId:mascot.id,statement});
-          }
           emit('complete',result);
         }
       }catch {try {emit('error',{error:'The connection was interrupted. Reopen your saved mission and retry.'});}catch{}}
-      finally {try{controller.close();}catch{}}
+      finally {clearInterval(heartbeat);request.signal.removeEventListener('abort',onAbort);try{controller.close();}catch{}}
     },
+    cancel(){cancelled=true;work.abort();},
   });
   return new Response(stream,{headers:{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-store','Connection':'keep-alive'}});
 }

@@ -5,7 +5,7 @@ export const IMPORT_LIMITS = { archiveBytes: 10 * 1024 * 1024, expandedBytes: 20
 const scalar = (value: string) => JSON.stringify(value);
 export const safeFileName = (value: string) => value.normalize('NFKC').replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/^[. ]+|[. ]+$/g, '').slice(0, 90) || 'Untitled';
 export function noteMarkdown(note: Note, missionId?: string): string {
-  return ['---', `thinkbuddy_id: ${scalar(note.id)}`, ...(missionId ? [`thinkbuddy_mission: ${scalar(missionId)}`] : []), `title: ${scalar(note.title)}`, `updated: ${scalar(note.updatedAt)}`, ...(note.statementId ? [`statement_id: ${scalar(note.statementId)}`] : []), 'tags: [thinkbuddy]', '---', '', note.content, ''].join('\n');
+  return ['---', `thinkbuddy_id: ${scalar(note.id)}`, ...(missionId ? [`thinkbuddy_mission: ${scalar(missionId)}`] : []), `title: ${scalar(note.title)}`, `updated: ${scalar(note.updatedAt)}`, ...(note.statementId ? [`statement_id: ${scalar(note.statementId)}`] : []), ...(note.theme?[`thinkbuddy_theme: ${scalar(note.theme)}`]:[]), ...(note.origin?[`thinkbuddy_origin: ${scalar(note.origin)}`]:[]), 'tags: [thinkbuddy]', '---', '', note.content, ''].join('\n');
 }
 /** Preserve user-owned YAML properties when updating an existing managed vault note. */
 export function preserveVaultProperties(previous: string | undefined, generated: string): string {
@@ -13,7 +13,7 @@ export function preserveVaultProperties(previous: string | undefined, generated:
   if (!frontmatter) return generated;
   const extras: string[] = []; let skip = false;
   for (const line of frontmatter.split('\n')) {
-    if (/^[^\s#][^:]*:/.test(line)) skip = /^(thinkbuddy_id|thinkbuddy_mission|title|updated|statement_id|tags):/.test(line);
+    if (/^[^\s#][^:]*:/.test(line)) skip = /^(thinkbuddy_id|thinkbuddy_mission|thinkbuddy_theme|thinkbuddy_origin|title|updated|statement_id|tags):/.test(line);
     if (!skip) extras.push(line);
   }
   return extras.length ? generated.replace('\n---\n', `\n${extras.join('\n')}\n---\n`) : generated;
@@ -35,17 +35,24 @@ export function parseMarkdown(text: string, fallbackTitle: string, fallbackId: s
     id: id || fallbackId, title: title.slice(0, 300), content: body.replace(/\n$/, ''),
     updatedAt: field(metadata, 'updated') || new Date().toISOString(),
     ...(field(metadata, 'statement_id') ? { statementId: field(metadata, 'statement_id') } : {}),
+    ...(field(metadata,'thinkbuddy_theme')?{theme:field(metadata,'thinkbuddy_theme')!.slice(0,500)}:{}),
+    ...(['automatic','user'].includes(field(metadata,'thinkbuddy_origin')??'')?{origin:field(metadata,'thinkbuddy_origin') as 'automatic'|'user'}:{}),
   } };
 }
 export function missionMarkdown(mission: Mission): string {
   const parts = ['---', `title: ${scalar(mission.title)}`, `thinkbuddy_mission: ${scalar(mission.id)}`, `updated: ${scalar(mission.updatedAt)}`, 'tags: [thinkbuddy, mission]', '---', '', `# ${mission.title}`, '', '## Perspectives', ...mission.mascots.map(m => `- **${m.name} (${m.role})**: ${m.motivation}`), '', '## Discussion'];
+  if(mission.brief)parts.push('', '## Mission brief', `Success: ${mission.brief.success}`, `People affected: ${mission.brief.audience}`, `Resources: ${mission.brief.resources}`, `Deadline: ${mission.brief.deadline}`);
+  if(mission.messages?.length)parts.push('', '## Your contributions',...mission.messages.flatMap(m=>['',`### ${m.kind==='takeaway'?'Saved takeaway':'Message'} (${m.createdAt})`,m.text]));
   for (const s of mission.statements) {
     parts.push('', `### ${mission.mascots.find(m => m.id === s.mascotId)?.name || s.mascotId}`, s.text, '', s.detail, '', `Evidence: ${s.status}`);
     for (const source of s.sources) { if (/^https?:\/\//i.test(source.url)) parts.push(`- [${source.title.replace(/[\[\]]/g, '')}](${encodeURI(source.url).replace(/[()]/g, encodeURIComponent)})`); }
+    if(s.evidenceReview)parts.push(`Checked: ${s.evidenceReview.checkedAt}`,s.evidenceReview.explanation,`Limitations: ${s.evidenceReview.limitations}`);
   }
   parts.push('', '## Notes', ...mission.notes.map(n => `- [[${noteExportName(n).replace(/\.md$/, '')}|${n.title.replace(/[|\]\n]/g, ' ')}]]`), '', '## Reflection', mission.reflection || 'No reflection recorded.', '', '## Scenarios');
   for (const s of mission.scenarios) parts.push(`### ${s.name}`, `Assumption: ${s.assumption}`, 'Hypothetical outcome:', s.outcome, '');
   parts.push('## Action plan', ...mission.actions.map(a => `- [${a.done ? 'x' : ' '}] ${a.text} (${a.priority}${a.deadline ? `; due ${a.deadline}` : ''}${a.dependsOn ? `; depends on ${a.dependsOn}` : ''})`));
+  if(mission.result){const r=mission.result;parts.push('', '## Working result',r.summary,'',r.recommendation,'',`What changed: ${r.changed}`,'',`Next step: ${r.nextStep}`,'', '### Unresolved',...r.unresolved.map(x=>`- ${x}`),'','### Experiment',r.experiment.action,`Success measure: ${r.experiment.successMeasure}`,`Owner: ${r.experiment.owner}`,`Review date: ${r.experiment.reviewDate}`);}
+  if(mission.outcome)parts.push('', '## Outcome review',mission.outcome.observed,'',mission.outcome.learned);
   return parts.join('\n');
 }
 export const noteExportName = (note: Note) => `${safeFileName(note.title)}--${safeFileName(note.id)}.md`;

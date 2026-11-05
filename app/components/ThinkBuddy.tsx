@@ -2,6 +2,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import MissionLanding from './MissionLanding';
+import CouncilWorkspace from './CouncilWorkspace';
+import { addUserMessage, demoWorkspace, mergeStatements, resolveMentions } from '../lib/discussion';
 import { ArrowUpRight } from '@phosphor-icons/react/dist/csr/ArrowUpRight';
 import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
@@ -39,7 +41,7 @@ import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight'
 import { Lightning } from '@phosphor-icons/react/dist/csr/Lightning';
 import { createDemoMission, demoCouncil } from '../lib/demo';
 import { loadGuestMissions, saveGuestMission, deleteGuestMission } from '../lib/guest-store';
-import type { CouncilRequest, Mascot, Mission, Statement, Tool } from '../lib/types';
+import type { CouncilRequest, Mascot, Mission, MissionBrief, Statement, Tool } from '../lib/types';
 import MascotStage, { Sprite } from './MascotStage';
 const ToolsPanel = lazy(()=>import('./ToolsPanel'));
 const SyncPanel = lazy(()=>import('./SyncPanel'));
@@ -63,6 +65,7 @@ async function jsonRequest(url:string,init?:RequestInit):Promise<ApiResult>{cons
 export default function ThinkBuddy({userName,guest=false,missionId}:{userName:string;guest?:boolean;missionId?:string}){
   const router=useRouter();
   const [ready,setReady]=useState(false);
+  const [startingMission,setStartingMission]=useState(false);
   const [mission,setMission]=useState<Mission|null>(null),[missions,setMissions]=useState<Mission[]>([]);
   const [live,setLive]=useState(false),[tool,setTool]=useState<Tool|null>(null),[selected,setSelected]=useState<string[]>([]);
   const [input,setInput]=useState(''),[busy,setBusy]=useState(false),[active,setActive]=useState<string|null>(null);
@@ -74,6 +77,8 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
   const debounce=useRef<ReturnType<typeof setTimeout>|null>(null),recorder=useRef<MediaRecorder|null>(null),voiceTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const playback=useRef<ReturnType<typeof setTimeout>[]>([]),dirty=useRef(false);
   const [notice,setNotice]=useState('');
+  const [progress,setProgress]=useState<Record<string,string>>({});
+  const busyRef=useRef(false),editVersion=useRef(0),knownRevisions=useRef(new Map<string,number>());
   const [syncMounted,setSyncMounted]=useState(false);
   useEffect(()=>{if(modal==='sync')setSyncMounted(true);},[modal]);
   useEffect(()=>{current.current=mission;},[mission]);
@@ -82,28 +87,35 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
   const chooseTheme=(t:'system'|'light'|'dark')=>{setTheme(t);localStorage.setItem('thinkbuddy-theme-v2',t);};
   useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(t);},[notice]);
   const save=useCallback(async(next:Mission)=>{
-    dirty.current=true;
+    const version=editVersion.current;dirty.current=true;
     const task=async()=>{
       setSaveStatus('Saving');
       try{
-        const old=current.current?.id===next.id?current.current:null,revision=Math.max(next.revision,old?.revision??0);
+        const revision=knownRevisions.current.get(next.id)??next.revision;
         const result=guest?{mission:saveGuestMission({...next,revision})}:await jsonRequest('/api/missions',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({mission:{...next,revision},expectedRevision:revision})});
-        const saved=result.mission as Mission;
+        const saved=result.mission as Mission;knownRevisions.current.set(saved.id,saved.revision);
         if(current.current?.id===saved.id){const updated={...current.current,revision:saved.revision};current.current=updated;setMission(updated);}
-        setMissions(all=>[saved,...all.filter(m=>m.id!==saved.id)]);setSaveStatus(guest?'Saved in this browser':'All changes saved');dirty.current=false;
+        setMissions(all=>[saved,...all.filter(m=>m.id!==saved.id)]);
+        if(editVersion.current===version){dirty.current=false;setSaveStatus(guest?'Saved in this browser':'All changes saved');}else setSaveStatus('Unsaved changes');
       }catch(e){setSaveStatus('Not saved');setError(e instanceof Error?e.message:'Could not save your mission.');throw e;}
     };
     const queued=saveQueue.current.then(task,task);saveQueue.current=queued.catch(()=>{});return queued;
   },[guest]);
-  const edit=useCallback((next:Mission)=>{const updated={...next,updatedAt:new Date().toISOString()};current.current=updated;setMission(updated);dirty.current=true;setSaveStatus('Unsaved changes');if(debounce.current)clearTimeout(debounce.current);debounce.current=setTimeout(()=>{debounce.current=null;void save(updated).catch(()=>{});},700);},[save]);
-  const flush=useCallback(async()=>{if(debounce.current){clearTimeout(debounce.current);debounce.current=null;if(current.current)await save(current.current);}await saveQueue.current;},[save]);
+  const edit=useCallback((next:Mission)=>{const updated={...next,updatedAt:new Date().toISOString()};editVersion.current+=1;current.current=updated;setMission(updated);dirty.current=true;setSaveStatus('Unsaved changes');if(debounce.current)clearTimeout(debounce.current);debounce.current=setTimeout(()=>{debounce.current=null;void save(updated).catch(()=>{});},700);},[save]);
+  const flush=useCallback(async()=>{if(debounce.current){clearTimeout(debounce.current);debounce.current=null;}await saveQueue.current;if(dirty.current&&current.current)await save(current.current);},[save]);
+  async function persistMission(next:Mission){if(debounce.current){clearTimeout(debounce.current);debounce.current=null;}await saveQueue.current;editVersion.current+=1;current.current=next;setMission(next);dirty.current=true;await save(next);}
+  async function saveTakeaway(text:string){
+    if(!current.current||busyRef.current)return;
+    await flush();const m=current.current;const next=addUserMessage({...m,reflection:text,notes:[...m.notes,{id:crypto.randomUUID(),title:'My takeaway',content:text,theme:'My decisions',origin:'user',updatedAt:new Date().toISOString()}]},text,[],'takeaway');
+    await persistMission(next);setNotice('Takeaway saved. Your next discussion will use it.');
+  }
   useEffect(()=>{
     let disposed=false;
     Promise.all(guest?[Promise.resolve().then(()=>({missions:loadGuestMissions()})),Promise.resolve({live:false})]:[jsonRequest('/api/missions'),jsonRequest('/api/config')]).then(async([data,config])=>{
-      if(disposed)return;setLive(config.live);setMissions(data.missions);
+      if(disposed)return;setLive(config.live);setMissions(data.missions);for(const item of data.missions)knownRevisions.current.set(item.id,item.revision);
       let m=missionId?data.missions.find((item:Mission)=>item.id===missionId):null;
       if(missionId&&!m&&!guest){const found=await jsonRequest('/api/missions?id='+encodeURIComponent(missionId));m=found.mission;}
-      if(disposed)return;setMission(m||null);current.current=m||null;setReady(true);setSaveStatus(guest?'Saved in this browser':'All changes saved');
+      if(disposed)return;if(m)knownRevisions.current.set(m.id,m.revision);setMission(m||null);current.current=m||null;setReady(true);setSaveStatus(guest?'Saved in this browser':'All changes saved');
       if(missionId&&!m)setError('This mission is not available in this workspace. Start a new mission from Home.');
     }).catch(e=>{if(!disposed){setError(e.message);setSaveStatus('Workspace unavailable');}});
     return()=>{disposed=true;abort.current?.abort();playback.current.forEach(clearTimeout);if(debounce.current)clearTimeout(debounce.current);if(voiceTimer.current)clearTimeout(voiceTimer.current);recorder.current?.stream.getTracks().forEach(t=>t.stop());};
@@ -111,25 +123,58 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
   useEffect(()=>{const guard=(e:BeforeUnloadEvent)=>{if(dirty.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[]);
   const highlight=(next:Mission)=>{playback.current.forEach(clearTimeout);next.mascots.forEach((m,i)=>playback.current.push(setTimeout(()=>setActive(m.id),i*2000)));playback.current.push(setTimeout(()=>setActive(null),next.mascots.length*2000));};
   async function command(action:CouncilRequest['action'],prompt='',base?:Mission,ids?:string[]){
-    if(busy)return;const source=base||current.current;if(!source)return;setBusy(true);setError('');setPaused(false);abort.current=new AbortController();
+    if(busyRef.current)return false;const source=base||current.current;if(!source)return false;
+    busyRef.current=true;setBusy(true);setProgress({});setError('');setPaused(false);abort.current=new AbortController();
     try{
-      await flush();const fresh=base||current.current!;
+      await flush();const fresh=current.current?.id===source.id?current.current:source;
       if(guest){
-        const result=demoCouncil({action,mission:fresh,prompt,mascotIds:ids||selected});
-        current.current=result;setMission(result);setInput('');await save(result);highlight(result);return true;
+        const request={action,mission:fresh,prompt,mascotIds:ids??[]};const result=demoWorkspace(request,demoCouncil(request));
+        current.current=result;setMission(result);await save(result);return true;
       }
-      const response=await fetch('/api/council',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action,mission:fresh,prompt,mascotIds:ids||selected}),signal:abort.current.signal});
+      const response=await fetch('/api/council',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action,mission:fresh,prompt,mascotIds:ids??[]}),signal:abort.current.signal});
       if(!response.ok){const e=await response.json() as {error?:string};throw new Error(e.error||'The council could not respond.');}
       const reader=response.body!.getReader(),decoder=new TextDecoder();let buffer='',result:Mission|null=null;
-      while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let end;while((end=buffer.indexOf('\n\n'))>=0){const frame=buffer.slice(0,end);buffer=buffer.slice(end+2);const event=frame.split('\n').find(l=>l.startsWith('event: '))?.slice(7);const payload=frame.split('\n').find(l=>l.startsWith('data: '))?.slice(6);if(!payload)continue;const data=JSON.parse(payload);if(event==='error')throw new Error(data.error);if(event==='statement')setActive(data.mascotId);if(event==='complete')result=data.mission;}}
-      if(!result)throw new Error('The response was interrupted. Your saved mission is safe.');
-      current.current=result;setMission(result);setInput('');await save(result);highlight(result);return true;
-    }catch(e){if(e instanceof Error&&e.name==='AbortError'){setPaused(true);setNotice('Discussion paused. Your previous thoughts are saved.');}else setError(e instanceof Error?e.message:'Something went wrong.');return false;}finally{setBusy(false);abort.current=null;}
+      const update=(change:(m:Mission)=>Mission)=>{if(!current.current||abort.current?.signal.aborted)return;const next=change(current.current);current.current=next;setMission(next);dirty.current=true;editVersion.current+=1;};
+      while(true){
+        const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});let end;
+        while((end=buffer.indexOf('\n\n'))>=0){
+          const frame=buffer.slice(0,end);buffer=buffer.slice(end+2);const event=frame.split('\n').find(l=>l.startsWith('event: '))?.slice(7);const payload=frame.split('\n').find(l=>l.startsWith('data: '))?.slice(6);if(!payload)continue;const data=JSON.parse(payload);
+          if(event==='error')throw new Error(data.error);
+          if(event==='warning')setNotice(data.message);
+          if(event==='thinking'&&data.mascotId)setProgress(all=>({...all,[data.mascotId]:data.status||'Thinking'}));
+          if(event==='roster')update(m=>({...m,mascots:data.mascots}));
+          if(event==='statement'){
+            update(m=>({...m,statements:mergeStatements(m.statements,[data.statement]),questions:data.questions??m.questions}));
+            setProgress(all=>{const next={...all};delete next[data.mascotId];return next;});
+          }
+          if(event==='result')update(m=>({...m,result:data.result}));
+          if(event==='notes')update(m=>({...m,notes:[...m.notes,...data.notes.filter((n:{id:string})=>!m.notes.some(old=>old.id===n.id))]}));
+          if(event==='complete')result=data.mission;
+        }
+      }
+      if(!result)throw new Error('The response was interrupted. Your messages and completed replies are saved.');
+      result={...result,revision:knownRevisions.current.get(result.id)??result.revision};current.current=result;setMission(result);await save(result);
+      if(action==='plan')setTool('path');return true;
+    }catch(e){
+      if(e instanceof Error&&e.name==='AbortError'){setPaused(true);setNotice('Discussion paused. Completed contributions are kept.');}
+      else setError(e instanceof Error?e.message:'Something went wrong.');
+      if(dirty.current&&current.current)try{await save(current.current);}catch{}
+      return false;
+    }finally{busyRef.current=false;setBusy(false);setProgress({});abort.current=null;}
   }
-  async function goHome(){if(busy)return;try{await flush();setModal(null);setSidebar(false);setTool(null);setNewTitle('');router.push('/');}catch(e){setError((e as Error).message);}}
-  async function newMission(title:string){
+  async function sendCouncil(text:string,ids:string[],questions:string[]){
+    if(busyRef.current||!current.current)return false;
+    const next=addUserMessage(current.current,text,questions);editVersion.current+=1;current.current=next;setMission(next);dirty.current=true;
+    const mentions=resolveMentions(text,next);return command('turn',text,next,mentions.length?mentions:ids);
+  }
+  async function discussCommand(action:CouncilRequest['action'],prompt='',ids?:string[]){
+    if(action==='turn')return sendCouncil(prompt,ids??[],[]);
+    return command(action,prompt,undefined,ids);
+  }
+  async function goHome(){if(busy)return;try{await flush();setStartingMission(false);setModal(null);setSidebar(false);setTool(null);setNewTitle('');router.push('/');}catch(e){setError((e as Error).message);}}
+  async function newMission(title:string,brief?:MissionBrief){
     if(!title.trim()||busy)return;
-    try{await flush();playback.current.forEach(clearTimeout);setActive(null);const next=createDemoMission(title.trim());next.statements=[];next.nodes=[];next.edges=[];next.round=0;setModal(null);setSelected([]);setTool(null);current.current=next;setMission(next);const ok=await command('generate','',next);if(ok)router.push('/mission/'+encodeURIComponent(next.id));}catch(e){setError((e as Error).message);}
+    try{await flush();playback.current.forEach(clearTimeout);setActive(null);const next=createDemoMission(title.trim());next.brief=brief;next.statements=[];next.nodes=[];next.edges=[];next.round=0;setModal(null);setSelected([]);setTool(null);setStartingMission(true);current.current=next;setMission(next);const ok=await command('generate','',next);if(ok)router.push('/mission/'+encodeURIComponent(next.id));}catch(e){setError((e as Error).message);}
   }
   async function openMission(m:Mission){try{await flush();playback.current.forEach(clearTimeout);setActive(null);setSelected([]);setModal(null);setSidebar(false);setTool(null);router.push('/mission/'+encodeURIComponent(m.id));}catch(e){setError((e as Error).message);}}
   async function goMission(){
@@ -154,7 +199,7 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
   }
   const toggleSelected=(id:string)=>setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
   const selectedNames=mission?.mascots.filter(m=>selected.includes(m.id)).map(m=>m.name).join(' & ');
-  const currentModeLimit=mission?{Quick:1,Standard:2,Deep:3}[mission.mode]:2;
+
   return <div className="app-shell">
     <div className="navbar-wrap">
       <nav className="navbar" aria-label="Main">
@@ -183,23 +228,18 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
       <div className="workspace-content">
       {!live&&<div className="demo-notice"><span className="demo-chip"><Sparkle size={13} weight="fill"/>Demo</span><span>{guest?'Guest demo: explore without an account. Missions save in this browser.':'You are exploring a sample council. Live AI requires a configured server API key.'}</span><button onClick={()=>setModal('settings')}>Setup <ArrowUpRight size={13} weight="bold"/></button></div>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label="Dismiss error"><X size={17} weight="bold"/></button></div>}
-      {!missionId?<MissionLanding onStart={newMission} onOpen={openMission} missions={missions} busy={busy} ready={ready}/>:!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
-        <div className="mission-page-actions"><button className="text-button" disabled={busy} onClick={()=>void goHome()}><House size={17}/>Home</button><button className="primary-button" disabled={busy} onClick={()=>{setNewTitle('');setModal('new');}}><Plus size={18}/>New Mission</button></div>
+      {!missionId&&!startingMission?<MissionLanding onStart={newMission} onOpen={openMission} missions={missions} busy={busy} ready={ready}/>:!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
         <section className="mission-card">
           <span className="mission-symbol"><Target size={34} weight="bold"/></span>
           <div className="mission-text"><span className="mission-eyebrow">Current Mission</span><h2 title={mission.title}>“{mission.title}”</h2></div>
-          <button className="brutal-button mission-edit" onClick={()=>{setNewTitle(mission.title);setModal('new');}} disabled={busy} aria-label="Start a revised mission"><PencilSimple size={16} weight="bold"/><span>Edit Mission</span></button>
+          <button className="brutal-button mission-edit" onClick={()=>{setNewTitle("");setModal("new");}} disabled={busy}><Plus size={16} weight="bold"/><span>New Mission</span></button>
         </section>
-        <div className="mobile-tool-nav">{toolItems.map(t=><button key={t.id} onClick={()=>setTool(t.id)} aria-label={t.name}><span className={'mini-icon tone-'+t.color}><t.icon size={15} weight="bold"/></span>{t.name}</button>)}</div>
-        <div className="council-layout"><div className="council-column">
-          <div className="section-heading council-toolbar"><div className="council-heading"><h3><span className="heading-dot"/>The Council</h3><span className="buddy-count">{mission.mascots.length} buddies</span>{live&&<span className="mode-badge live-mode"><span/>Live AI</span>}</div><div className="council-controls"><label className="mode-select"><span className="sr-only">Discussion depth</span><select disabled={busy} value={mission.mode} onChange={e=>edit({...mission,mode:e.target.value as Mission['mode']})}><option>Quick</option><option>Standard</option><option>Deep</option></select><CaretDown size={12} weight="bold"/></label><button className="brutal-button small-button" disabled={busy||mission.mascots.length>=6} onClick={()=>{const extra:Mascot={id:crypto.randomUUID(),name:'New perspective',role:'Fresh viewpoint',personality:'Curious and independent',motivation:'Find a missing perspective',color:'#C99681',sprite:mission.mascots.length};void command('replace','Add a relevant perspective we have not considered.',{...mission,mascots:[...mission.mascots,extra]},[extra.id]);}}><Plus size={15} weight="bold"/>Invite buddy</button></div></div>
-          <MascotStage mission={mission} selected={selected} onSelect={toggleSelected} busy={busy} active={active} onDetail={setDetail} onManage={setManage}/>
-          <div className="quick-actions"><button className="chip chip-yellow" disabled={busy} onClick={()=>void command('turn','What assumption should we question?')}><Lightning size={16} weight="bold"/>Challenge an assumption</button><button className="chip chip-cyan" disabled={busy} onClick={()=>void command('turn',selected.length>1?'Compare your perspectives and explore a meaningful disagreement.':'Offer a different perspective on our mission.')}><ChatCircleDots size={16} weight="bold"/>{selected.length>1?'Start a debate':'Another perspective'}</button><button className="chip chip-mint" disabled={busy} onClick={()=>setTool('vault')}><Notebook size={16} weight="bold"/>Capture a thought</button></div>
-          <div className="participation"><div className="composer-context"><span><Sprite index={0}/>{selectedNames?'Talking with '+selectedNames:'What’s on your mind?'}</span>{selected.length>0?<button onClick={()=>setSelected([])}>Talk to everyone <X size={12} weight="bold"/></button>:<span className="enter-hint">Enter to send</span>}</div><form className="composer-row" onSubmit={e=>{e.preventDefault();if(input.trim())void command('turn',input);}}><button type="button" className={'voice-button '+(recording?'recording':'')} disabled={busy||voiceBusy} onClick={()=>void startRecording()} aria-label={recording?'Stop recording':'Record a voice question'} title={recording?'Stop recording':'Use your voice'}>{recording?<Stop size={22} weight="fill"/>:<Microphone size={22} weight="bold"/>}{(recording||voiceBusy)&&<span>{recording?'Stop':'Transcribing…'}</span>}</button><label className="sr-only" htmlFor="question">Your question to the council</label><textarea id="question" rows={1} value={input} onChange={e=>setInput(e.target.value)} placeholder={selectedNames?'Ask '+selectedNames+' a question…':'Ask the council, challenge a point, or add evidence…'} disabled={busy} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(input.trim())void command('turn',input);}}}/><button className="send-button" type="submit" disabled={busy||!input.trim()} aria-label="Send to council"><PaperPlaneRight size={22} weight="fill"/></button></form></div>
-          <div className="discussion-footer"><button className="text-button" onClick={()=>setModal('history')}><ClockCounterClockwise size={16} weight="bold"/>Discussion history <span>{mission.statements.length}</span></button><span className="round-pill">Round {mission.round}</span>{busy?<button className="brutal-button small-button" onClick={()=>abort.current?.abort()}><Pause size={15} weight="fill"/>Pause</button>:<button className="brutal-button small-button" onClick={()=>{if(mission.round>=currentModeLimit&&!mission.reflection){setTool('path');setNotice('Take a moment to reflect before another round.');}else void command('turn','Continue the discussion with new insights.');}}><Play size={14} weight="fill"/>{paused?'Resume':'Next round'}</button>}</div>
-        </div>
-        <aside className={'thinking-space '+(tool?'tool-open':'')}>{tool?<><div className="tool-tabs">{toolItems.map(t=><button key={t.id} className={t.id===tool?'active':''} onClick={()=>setTool(t.id)} aria-label={t.name} title={t.name}><t.icon size={19} weight="bold"/></button>)}</div><Suspense fallback={<div className="skeleton-stage"/>}><ToolsPanel tool={tool} mission={mission} onChange={edit} onCommand={async(action,prompt)=>{await command(action,prompt);}} busy={busy} onClose={()=>setTool(null)}/></Suspense></>:<><div className="section-heading"><h3><span className="heading-dot"/>Thinking Tools</h3></div><div className="tool-launchers">{toolItems.map(t=><button className="tool-launcher" key={t.id} onClick={()=>setTool(t.id)}><span className={'tool-icon tone-'+t.color}><t.icon size={24} weight="bold"/></span><span><strong>{t.name}</strong><small>{t.description}</small></span><CaretRight size={16} weight="bold"/></button>)}</div><div className="reflection-card"><div className="reflection-top"><span className="reflection-icon"><Lightbulb size={22} weight="fill"/></span><span className="small-label">A moment to reflect</span></div><h4>What’s one thing you hadn’t considered?</h4><p>The best insight might be the one that changes your question.</p><button onClick={()=>setTool('path')}>Save your reflection <ArrowUpRight size={16} weight="bold"/></button></div><div className="human-note"><ShieldCheck size={20} weight="fill"/><p>AI brings perspectives. <strong>You make the call.</strong></p></div></>}</aside>
-        </div>
+        <CouncilWorkspace key={mission.id} mission={mission} busy={busy} live={live} saveStatus={saveStatus} progress={progress}
+          input={input} setInput={setInput} recording={recording} voiceBusy={voiceBusy} onVoice={()=>void startRecording()}
+          onSend={sendCouncil} onCommand={discussCommand} onChange={edit} onSave={persistMission} onTakeaway={saveTakeaway}
+          onPause={()=>abort.current?.abort()} onManage={setManage} onOpenTool={setTool}/>
+        {tool&&<Modal title={toolItems.find(t=>t.id===tool)?.name??'Thinking tools'} wide onClose={()=>setTool(null)}><Suspense fallback={<p>Opening your workspace…</p>}><ToolsPanel tool={tool} mission={mission} onChange={edit} onCommand={async(action,prompt)=>{await command(action,prompt);}} busy={busy} onClose={()=>setTool(null)}/></Suspense></Modal>}
+
       </>}
       <footer className="workspace-footer"><span>ThinkBuddy · A little company for big ideas</span><span>Made for curious minds <Leaf size={13} weight="fill"/></span></footer></div>
     </main>

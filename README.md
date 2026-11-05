@@ -22,6 +22,10 @@ Voice input records up to 60 seconds, sends audio to server-side transcription, 
 
 ## Data and sync
 
+The mission workspace is a shared conversation with a Result, Notes, and Sources panel. Companions respond in parallel from the same context; validated contributions stream as each finishes. Buddy synthesizes the discussion into qualitative options and a measurable experiment, and adds editable notes organized by theme. Two key contributions per discussion receive automatic evidence reviews. Source cards show actual search citations, AI-generated source summaries, review dates, and limitations; companion agreement never counts as independent confirmation. Failed research leaves the contribution unverified and can be retried.
+
+Users can address the whole council or use @name, answer selected questions together, reopen answer mappings, and queue up to five follow-ups while a turn is running. Saving a takeaway is independent of generating a plan. Optional mission briefs and outcome reviews provide context for subsequent replies. Existing missions remain compatible and acquire a working result when their discussion continues. Mobile views expose the same conversation, result, notes, and sources through tabs.
+
 Missions are owner-scoped D1 records with optimistic revision checks. Council command IDs prevent accidental duplicate execution. Interrupted generation preserves the last saved mission. Failed requests remain visible and are never silently replaced with demo output.
 
 Obsidian sync uses desktop Chrome/Edge directory permissions. Only managed notes inside ThinkBuddy/<mission-id> are read or written. Sync preserves both sides of conflicting edits until the user chooses a resolution. Deletions require explicit selection. The browser connection and last synchronized hashes are device-local. Import and export support Markdown and ZIP plus JSON Canvas. Synced notes are not automatically sent to AI.
