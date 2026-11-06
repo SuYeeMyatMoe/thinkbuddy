@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import ts from 'typescript';
 const folder=new URL('../.cache/discussion-tests/',import.meta.url);await mkdir(folder,{recursive:true});
-for(const name of ['demo','discussion','server-validation','server-ai']){
+for(const name of ['demo','discussion','server-validation','server-ai','builder-schema','builder']){
   const source=await readFile(new URL(`../app/lib/${name}.ts`,import.meta.url),'utf8');
   const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace("import { env } from 'cloudflare:workers';","const env=globalThis.__thinkbuddyTestEnv;").replace(/from '\.\/([^']+)'/g,"from './$1.mjs'");
   await writeFile(new URL(name+'.mjs',folder),compiled);
@@ -31,7 +31,7 @@ test('progressive updates replace evidence in place and questions are not duplic
   assert.equal(mergeStatements([s],[{...s,detail:'Updated evidence'}])[0].detail,'Updated evidence');
   const q=addQuestions([], [s]);assert.equal(addQuestions(q,[{...s,id:'other'}]).length,1);
 });
-test('all companions run in parallel and stream before the synthesis; result and themed notes persist',async()=>{
+test('all companions run in parallel and stream before the synthesis; result persists without creating notes',async()=>{
   const m=addUserMessage(createDemoMission(),'We can spare two volunteers.');let active=0,maxActive=0,completed=0;const events=[];const original=globalThis.fetch;
   globalThis.fetch=async(_,init)=>{
     const b=JSON.parse(init.body);
@@ -45,7 +45,7 @@ test('all companions run in parallel and stream before the synthesis; result and
     assert.equal(JSON.parse(b.input).mission.messages.at(-1).text,'We can spare two volunteers.');return response(full(m));
   };
   try{const next=await liveCouncil({action:'turn',mission:m,prompt:'We can spare two volunteers.'},undefined,(event,data)=>events.push({event,data}));
-    assert.equal(maxActive,4);assert.equal(next.statements.length,m.statements.length+5);assert.equal(next.notes[0].origin,'automatic');assert.equal(next.notes[0].theme,'Decisions');assert.equal(next.result.summary,result.summary);assert.equal(next.questions.length,1);assert.equal(next.round,m.round+1);assert.ok(missionSchema.safeParse(next).success);
+    assert.equal(maxActive,4);assert.equal(next.statements.length,m.statements.length+5);assert.deepEqual(next.notes,m.notes);assert.equal(next.result.summary,result.summary);assert.equal(next.questions.length,1);assert.equal(next.round,m.round+1);assert.ok(missionSchema.safeParse(next).success);
   }finally{globalThis.fetch=original;}
 });
 test('positive evidence labels require actual search citations and relevant source summaries',async()=>{
@@ -61,8 +61,8 @@ test('planning does not require a reflection and long saved takeaways fit the re
   const m=createDemoMission(),original=globalThis.fetch;globalThis.fetch=async()=>response(full(m));
   try{const next=await liveCouncil({action:'plan',mission:m});assert.equal(next.actions.length,1);assert.equal(next.reflection,'');m.reflection='a'.repeat(16000);assert.ok(councilRequestSchema.safeParse({action:'plan',mission:m,prompt:m.reflection}).success);}finally{globalThis.fetch=original;}
 });
-test('guest previews preserve context and transparently label automatic notes',()=>{
+test('guest previews preserve context without generating notebook entries',()=>{
   const m=createDemoMission();m.brief={success:'A measurable improvement',audience:'Students',resources:'Two volunteers',deadline:''};
   const req={action:'turn',mission:addUserMessage(m,'We have two volunteers.'),prompt:'We have two volunteers.'};
-  const next=demoWorkspace(req,demoCouncil(req));assert.equal(next.messages.length,1);assert.equal(next.brief.resources,'Two volunteers');assert.ok(next.notes[0].content.includes('demo'));assert.ok(next.result.summary.startsWith('Demo:'));assert.ok(missionSchema.safeParse(next).success);
+  const next=demoWorkspace(req,demoCouncil(req));assert.equal(next.messages.length,1);assert.equal(next.brief.resources,'Two volunteers');assert.equal(next.notes.length,m.notes.length);assert.ok(next.result.summary.startsWith('Demo:'));assert.ok(missionSchema.safeParse(next).success);
 });

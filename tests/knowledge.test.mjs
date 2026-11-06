@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile,writeFile,mkdir} from 'node:fs/promises';import ts from 'typescript';
 const dir=new URL('../.cache/knowledge-tests/',import.meta.url);await mkdir(dir,{recursive:true});
-for(const name of ['knowledge','demo','server-validation']){await writeFile(new URL(name+'.mjs',dir),ts.transpileModule(await readFile(new URL(`../app/lib/${name}.ts`,import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText);}
+for(const name of ['knowledge','demo','server-validation','builder','builder-schema']){await writeFile(new URL(name+'.mjs',dir),ts.transpileModule(await readFile(new URL(`../app/lib/${name}.ts`,import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/from '\.\/([^']+)'/g,"from './$1.mjs'"));}
 const {captureMapIdea,putNoteOnMap}=await import(new URL('knowledge.mjs',dir));const {createDemoMission,addThinkingNodes}=await import(new URL('demo.mjs',dir));const {missionSchema}=await import(new URL('server-validation.mjs',dir));
 test('capturing a mapped contribution creates one linked note with explanation and evidence',()=>{
  const m=createDemoMission(),n=m.nodes.find(n=>n.statementId);m.statements.find(s=>s.id===n.statementId).sources=[{title:'Example source',url:'https://example.org/evidence'}];

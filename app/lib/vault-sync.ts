@@ -1,12 +1,12 @@
-import type { Note } from './types';
-import { noteMarkdown, noteExportName, parseMarkdown, preserveVaultProperties, safeFileName } from './export';
+import type { Mission, Note } from './types';
+import { noteMarkdown, noteExportName, parseMarkdown, preserveVaultProperties, safeFileName, secondBrainFiles } from './export';
 
 interface VaultFile { kind: 'file'; name: string; getFile(): Promise<File>; createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }> }
 interface VaultDirectory { kind: 'directory'; name: string; getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<VaultDirectory>; getFileHandle(name: string, options?: { create?: boolean }): Promise<VaultFile>; removeEntry(name: string): Promise<void>; values(): AsyncIterable<VaultFile | VaultDirectory>; queryPermission(options: { mode: 'readwrite' }): Promise<PermissionState>; requestPermission(options: { mode: 'readwrite' }): Promise<PermissionState> }
 interface Baseline { hash: string; path: string; }
 export interface SyncConflict { id: string; kind: 'edited-both' | 'deleted-local' | 'deleted-cloud' | 'duplicate-id'; local?: Note; remote?: Note; path: string; }
 export type SyncResolution = 'local' | 'remote' | 'delete-local' | 'delete-remote';
-export interface SyncResult { notes: Note[]; conflicts: SyncConflict[]; written: number; imported: number; deleted: number; syncedAt: string; }
+export interface SyncResult { notes: Note[]; conflicts: SyncConflict[]; written: number; imported: number; deleted: number; generated: number; preserved: string[]; syncedAt: string; }
 const DATABASE = 'thinkbuddy-vault-sync';
 let current: VaultDirectory | null = null;
 let currentVaultId = '';
@@ -61,13 +61,14 @@ export function decideSync(base: string | undefined, local: string | undefined, 
 }
 
 /** Save callback must persist returned notes with a cloud revision check and throw on conflict. */
-export async function syncVault(missionId: string, notes: Note[], save: (notes: Note[]) => Promise<void>, resolutions: Record<string, SyncResolution> = {}): Promise<SyncResult> {
+export async function syncVault(mission: Mission, save: (notes: Note[]) => Promise<void>, resolutions: Record<string, SyncResolution> = {}): Promise<SyncResult> {
   if (running) throw new Error('A vault sync is already running.');
-  const perform = async () => { running = true; try { return await synchronize(missionId, notes, save, resolutions); } finally { running = false; } };
+  const perform = async () => { running = true; try { return await synchronize(mission, save, resolutions); } finally { running = false; } };
   if (typeof navigator !== 'undefined' && navigator.locks) return navigator.locks.request('thinkbuddy-vault-sync', { ifAvailable: true }, lock => { if (!lock) throw new Error('Another ThinkBuddy tab is syncing this vault.'); return perform(); });
   return perform();
 }
-async function synchronize(missionId: string, notes: Note[], save: (notes: Note[]) => Promise<void>, resolutions: Record<string, SyncResolution>): Promise<SyncResult> {
+async function synchronize(mission: Mission, save: (notes: Note[]) => Promise<void>, resolutions: Record<string, SyncResolution>): Promise<SyncResult> {
+  const { id: missionId, notes } = mission;
   if (!current || await current.queryPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Reconnect your vault to resume folder synchronization.');
   const root = await current.getDirectoryHandle('ThinkBuddy', { create: true });
   const folderName = safeFileName(missionId);
@@ -127,5 +128,38 @@ async function synchronize(missionId: string, notes: Note[], save: (notes: Note[
   for (const item of writes) { const previous = await checkUnchanged(item.path, item.previous); const writer = await (await dir.getFileHandle(item.path, { create: true })).createWritable(); await writer.write(preserveVaultProperties(previous, noteMarkdown(item.note, missionId))); await writer.close(); }
   for (const item of deletes) { await checkUnchanged(item.path, item.previous); await dir.removeEntry(item.path); }
   await persist(storageKey, nextBase);
-  return { notes: resultNotes, conflicts, written: writes.length, imported, deleted: deletes.length + Math.max(0, notes.length - resultNotes.length), syncedAt: new Date().toISOString() };
+  const generated = conflicts.length ? { written: 0, preserved: [] } : await writeSecondBrain(dir, storageKey, secondBrainFiles(
+    { ...mission, notes: resultNotes }, Object.fromEntries(Object.entries(nextBase).map(([id, entry]) => [id, entry.path])),
+  ));
+  return { notes: resultNotes, conflicts, written: writes.length, imported, generated: generated.written, preserved: generated.preserved, deleted: deletes.length + Math.max(0, notes.length - resultNotes.length), syncedAt: new Date().toISOString() };
+}
+
+async function textHash(content: string): Promise<string> {
+  const bytes = new TextEncoder().encode(content.replace(/\r\n/g, '\n'));
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function writeSecondBrain(dir: VaultDirectory, storageKey: string, files: Record<string, string>): Promise<{ written: number; preserved: string[] }> {
+  const folder = await dir.getDirectoryHandle('Second Brain', { create: true });
+  const key = `${storageKey}:generated`;
+  const baseline = await stored<Record<string, string>>(key) || {};
+  let written = 0;
+  const preserved: string[] = [];
+  for (const [name, content] of Object.entries(files)) {
+    const hash = await textHash(content);
+    let existing: string | undefined;
+    try { existing = await (await (await folder.getFileHandle(name)).getFile()).text(); }
+    catch (error) { if ((error as DOMException).name !== 'NotFoundError') throw error; }
+    const existingHash = existing === undefined ? undefined : await textHash(existing);
+    if (existingHash === hash) { baseline[name] = hash; continue; }
+    // A generated file edited (or deleted) in Obsidian belongs to the user now.
+    if (existingHash !== baseline[name]) { preserved.push(name); continue; }
+    const writer = await (await folder.getFileHandle(name, { create: true })).createWritable();
+    await writer.write(content); await writer.close();
+    baseline[name] = hash; written++;
+    // Commit each successful file so interrupted generation can safely resume.
+    await persist(key, baseline);
+  }
+  await persist(key, baseline);
+  return { written, preserved };
 }

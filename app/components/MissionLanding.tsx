@@ -4,7 +4,7 @@ import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { ClockCounterClockwise } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import type { Mission, MissionBrief } from '../lib/types';
 
-const starters=[{label:'Explore an Idea',question:'How can I market my new healthy snack?'},{label:'Make a Decision',question:'How can I design an affordable and comfortable family home?'},{label:'Learn Something',question:'How do real software engineering teams work?'}];
+const starters=[{label:'Explore an Idea',question:'How can I market my new healthy snack?'},{label:'Make a Decision',question:'How can I design an affordable and comfortable family home?'},{label:'Learn Something',question:'Should my study planner focus on reminders or flexible schedules?'}];
 export default function MissionLanding({onStart,onOpen,missions,busy,ready}:{onStart:(title:string,brief?:MissionBrief)=>Promise<void>;onOpen:(mission:Mission)=>Promise<void>;missions:Mission[];busy:boolean;ready:boolean}){
   const [question,setQuestion]=useState('');
   const [brief,setBrief]=useState<MissionBrief>({success:'',audience:'',resources:'',deadline:''});

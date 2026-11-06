@@ -1,0 +1,37 @@
+- generic [ref=e182]:
+  - navigation "Main" [ref=e183]:
+    - link "ThinkBuddy home" [ref=e184] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e187]: ThinkBuddy
+    - button "Projects" [ref=e188] [cursor=pointer]
+    - generic [ref=e191]:
+      - button "Toggle color theme" [ref=e192] [cursor=pointer]
+      - button "Settings and help" [ref=e195] [cursor=pointer]: G
+  - main [ref=e196]:
+    - generic [ref=e197]:
+      - generic [ref=e198]:
+        - generic [ref=e199]:
+          - generic [ref=e200]: YOUR THINKING SPACE
+          - heading "Should my study planner focus on reminders or flexible schedules?" [level=1] [ref=e201]
+          - paragraph [ref=e202]: Understand the problem. Find a useful next step.
+        - generic [ref=e203]:
+          - generic [ref=e204]: Demo · simulated discussion
+          - status [ref=e205]: Saved in this browser
+      - generic [ref=e206]:
+        - navigation "Project workspace" [ref=e207]:
+          - button "Discuss" [ref=e208] [cursor=pointer]
+          - button "Breakdown" [active] [ref=e209] [cursor=pointer]
+          - button "Research" [ref=e210] [cursor=pointer]
+          - generic [ref=e211]: Room to think
+        - generic [ref=e361]:
+          - generic [ref=e362]:
+            - generic [ref=e363]: MAKE THE PROBLEM SMALLER
+            - heading "One clear focus at a time." [level=2] [ref=e364]
+            - paragraph [ref=e365]: Understand what matters, separate assumptions from facts, and choose where to begin.
+          - generic [ref=e366]:
+            - heading "Give the problem a little structure." [level=3] [ref=e367]
+            - paragraph [ref=e368]: Buddy will use your discussion and attachments to suggest smaller issues. You can edit everything.
+            - button "Break down this problem" [ref=e369] [cursor=pointer]
+      - generic [ref=e356]:
+        - generic [ref=e357]: ThinkBuddy · A little company for big ideas
+        - generic [ref=e358]: Made for curious minds
