@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import ts from 'typescript';
 const folder=new URL('../.cache/council-tests/',import.meta.url);await mkdir(folder,{recursive:true});
-for(const name of ['demo','server-validation']){
+for(const name of ['demo','server-validation','builder-schema','builder']){
  const source=await readFile(new URL('../app/lib/'+name+'.ts',import.meta.url),'utf8');
- await writeFile(new URL(name+'.mjs',folder),ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText);
+ await writeFile(new URL(name+'.mjs',folder),ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/from '\.\/([^']+)'/g,"from './$1.mjs'"));
 }
 const {createDemoMission,demoCouncil}=await import(new URL('demo.mjs',folder));
 const {missionSchema}=await import(new URL('server-validation.mjs',folder));

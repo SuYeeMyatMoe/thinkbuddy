@@ -1,0 +1,49 @@
+[   32306ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=1ab011e1:14337
+[  675877ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:5173/app/components/CouncilWorkspace.tsx?t=1793948362233:0
+[  675879ms] [ERROR] [vite] Failed to reload /app/components/CouncilWorkspace.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:5173/@vite/client:509
+[  675903ms] [ERROR] [vite] Internal Server Error
+Failed to resolve import "./builder.css" from "app/components/CouncilWorkspace.tsx". Does the file exist?
+    at TransformPluginContext._formatLog (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30486:39)
+    at TransformPluginContext.error (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30483:14)
+    at normalizeUrl (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27725:18)
+    at async file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27788:30
+    at async Promise.all (index 8)
+    at async TransformPluginContext.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27756:4)
+    at async EnvironmentPluginContainer.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30271:14)
+    at async loadAndTransform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:24532:26) @ http://127.0.0.1:5173/@vite/client:509
+[  676125ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:5173/app/components/CouncilWorkspace.tsx?t=1793948362233:0
+[  676126ms] [ERROR] [vite] Failed to reload /app/components/ThinkBuddy.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:5173/@vite/client:509
+[  676148ms] [ERROR] [vite] Internal Server Error
+Failed to resolve import "./builder.css" from "app/components/CouncilWorkspace.tsx". Does the file exist?
+    at TransformPluginContext._formatLog (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30486:39)
+    at TransformPluginContext.error (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30483:14)
+    at normalizeUrl (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27725:18)
+    at async file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27788:30
+    at async Promise.all (index 8)
+    at async TransformPluginContext.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27756:4)
+    at async EnvironmentPluginContainer.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30271:14)
+    at async loadAndTransform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:24532:26) @ http://127.0.0.1:5173/@vite/client:509
+[  729756ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:5173/app/components/CouncilWorkspace.tsx?t=1793948362233:0
+[  729756ms] [ERROR] [vite] Failed to reload /app/components/ThinkBuddy.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:5173/@vite/client:509
+[  729914ms] [ERROR] [vite] Internal Server Error
+Failed to resolve import "./builder.css" from "app/components/CouncilWorkspace.tsx". Does the file exist?
+    at TransformPluginContext._formatLog (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30486:39)
+    at TransformPluginContext.error (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30483:14)
+    at normalizeUrl (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27725:18)
+    at async file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27788:30
+    at async Promise.all (index 8)
+    at async TransformPluginContext.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27756:4)
+    at async EnvironmentPluginContainer.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30271:14)
+    at async loadAndTransform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:24532:26) @ http://127.0.0.1:5173/@vite/client:509
+[  729984ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:5173/app/components/CouncilWorkspace.tsx?t=1793948416216:0
+[  729984ms] [ERROR] [vite] Failed to reload /app/components/ThinkBuddy.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://127.0.0.1:5173/@vite/client:509
+[  729987ms] [ERROR] [vite] Internal Server Error
+Failed to resolve import "./builder.css" from "app/components/CouncilWorkspace.tsx". Does the file exist?
+    at TransformPluginContext._formatLog (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30486:39)
+    at TransformPluginContext.error (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30483:14)
+    at normalizeUrl (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27725:18)
+    at async file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27788:30
+    at async Promise.all (index 8)
+    at async TransformPluginContext.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:27756:4)
+    at async EnvironmentPluginContainer.transform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:30271:14)
+    at async loadAndTransform (file:///C:/Cool_Hackathon/TT_Buddy/thinkbuddy/node_modules/vite/dist/node/chunks/node.js:24532:26) @ http://127.0.0.1:5173/@vite/client:509

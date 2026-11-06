@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import ts from 'typescript';
 const dir=new URL('../.cache/attachment-tests/',import.meta.url);await mkdir(dir,{recursive:true});
-for(const name of ['attachments','discussion','server-validation']){
+for(const name of ['attachments','discussion','server-validation','builder','builder-schema']){
   const s=await readFile(new URL(`../app/lib/${name}.ts`,import.meta.url),'utf8');
-  await writeFile(new URL(name+'.mjs',dir),ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText);
+  await writeFile(new URL(name+'.mjs',dir),ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/from '\.\/([^']+)'/g,"from './$1.mjs'"));
 }
 const {attachmentMime,validateUploads,extractPlainText,validateBinary}=await import(new URL('attachments.mjs',dir));
 const {addUserMessage}=await import(new URL('discussion.mjs',dir));

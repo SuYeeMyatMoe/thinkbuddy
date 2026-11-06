@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import ts from 'typescript';
 const folder=new URL('../.cache/guest-tests/',import.meta.url);await mkdir(folder,{recursive:true});
-for(const name of ['guest-store','server-validation','demo']){
+for(const name of ['guest-store','server-validation','demo','builder-schema','builder']){
  const source=await readFile(new URL('../app/lib/'+name+'.ts',import.meta.url),'utf8');
- const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace("from './server-validation'","from './server-validation.mjs'");
+ const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/from '\.\/([^']+)'/g,"from './$1.mjs'");
  await writeFile(new URL(name+'.mjs',folder),js);
 }
 const {GUEST_KEY,loadGuestMissions,saveGuestMission,deleteGuestMission}=await import(new URL('guest-store.mjs',folder));

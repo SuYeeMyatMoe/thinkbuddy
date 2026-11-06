@@ -1,0 +1,142 @@
+- generic [ref=e182]:
+  - navigation "Main" [ref=e183]:
+    - link "ThinkBuddy home" [ref=e184] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e187]: ThinkBuddy
+    - button "Projects" [ref=e188] [cursor=pointer]
+    - generic [ref=e191]:
+      - button "Toggle color theme" [ref=e192] [cursor=pointer]
+      - button "Settings and help" [ref=e195] [cursor=pointer]: G
+  - main [ref=e196]:
+    - generic [ref=e197]:
+      - generic [ref=e198]:
+        - generic [ref=e199]:
+          - generic [ref=e200]: YOUR THINKING SPACE
+          - heading "Should my study planner focus on reminders or flexible schedules?" [level=1] [ref=e201]
+          - paragraph [ref=e202]: Understand the problem. Find a useful next step.
+        - generic [ref=e203]:
+          - generic [ref=e204]: Demo · simulated discussion
+          - status [ref=e205]: Saved in this browser
+      - generic [ref=e206]:
+        - navigation "Project workspace" [ref=e207]:
+          - button "Discuss" [ref=e208] [cursor=pointer]
+          - button "Breakdown" [ref=e209] [cursor=pointer]
+          - button "Research" [ref=e210] [cursor=pointer]
+          - generic [ref=e211]: Room to think
+        - generic [ref=e212]:
+          - generic [ref=e213]:
+            - generic [ref=e214]:
+              - text: Here to
+              - combobox "Discussion purpose" [ref=e215]:
+                - option "explore an idea" [selected]
+                - option "make a decision"
+                - option "prepare a user test"
+            - button "Thinking receipt" [ref=e216] [cursor=pointer]
+          - region "Your mascot thinking council" [ref=e217]:
+            - generic [ref=e218]:
+              - generic [ref=e219]: Council active
+              - generic [ref=e221]:
+                - button "Enlarge council" [ref=e222] [cursor=pointer]
+                - button "Reset character positions" [ref=e225] [cursor=pointer]
+            - generic [ref=e229]:
+              - generic [ref=e231]:
+                - 'button "Buddy: Let’s look at your question from a few different angles.. Open explanation" [ref=e232] [cursor=pointer]':
+                  - generic [ref=e233]: Buddy
+                  - generic [ref=e236]: Let’s look at your question from a few different angles.
+                - button "Select Buddy, Your thinking companion" [ref=e237]
+                - generic [ref=e240]:
+                  - button "Buddy Your thinking companion" [ref=e241] [cursor=pointer]:
+                    - generic [ref=e242]: Buddy
+                    - generic [ref=e243]: Your thinking companion
+                  - button "Manage Buddy" [ref=e244] [cursor=pointer]
+              - generic [ref=e248]:
+                - 'button "Pip: Who would benefit most, and what do they need?. Open explanation" [ref=e249] [cursor=pointer]':
+                  - generic [ref=e250]: Pip
+                  - generic [ref=e253]: Who would benefit most, and what do they need?
+                - button "Select Pip, People-first perspective" [ref=e254]
+                - generic [ref=e257]:
+                  - button "Pip People-first perspective" [ref=e258] [cursor=pointer]:
+                    - generic [ref=e259]: Pip
+                    - generic [ref=e260]: People-first perspective
+                  - button "Manage Pip" [ref=e261] [cursor=pointer]
+              - generic [ref=e265]:
+                - 'button "Otto: What constraints should we work within?. Open explanation" [ref=e266] [cursor=pointer]':
+                  - generic [ref=e267]: Otto
+                  - generic [ref=e270]: What constraints should we work within?
+                - button "Select Otto, Practical perspective" [ref=e271]
+                - generic [ref=e274]:
+                  - button "Otto Practical perspective" [ref=e275] [cursor=pointer]:
+                    - generic [ref=e276]: Otto
+                    - generic [ref=e277]: Practical perspective
+                  - button "Manage Otto" [ref=e278] [cursor=pointer]
+              - generic [ref=e282]:
+                - 'button "Jay: Could a different approach solve the same problem?. Open explanation" [ref=e283] [cursor=pointer]':
+                  - generic [ref=e284]: Jay
+                  - generic [ref=e287]: Could a different approach solve the same problem?
+                - button "Select Jay, Creative perspective" [ref=e288]
+                - generic [ref=e291]:
+                  - button "Jay Creative perspective" [ref=e292] [cursor=pointer]:
+                    - generic [ref=e293]: Jay
+                    - generic [ref=e294]: Creative perspective
+                  - button "Manage Jay" [ref=e295] [cursor=pointer]
+              - generic [ref=e299]:
+                - 'button "Cleo: What are we assuming, and how could we check?. Open explanation" [ref=e300] [cursor=pointer]':
+                  - generic [ref=e301]: Cleo
+                  - generic [ref=e304]: What are we assuming, and how could we check?
+                - button "Select Cleo, Critical perspective" [ref=e305]
+                - generic [ref=e308]:
+                  - button "Cleo Critical perspective" [ref=e309] [cursor=pointer]:
+                    - generic [ref=e310]: Cleo
+                    - generic [ref=e311]: Critical perspective
+                  - button "Manage Cleo" [ref=e312] [cursor=pointer]
+            - generic [ref=e315]:
+              - generic [ref=e318]: Select a speech card for the explanation.
+              - generic [ref=e319]: Select a buddy to talk directly
+          - generic [ref=e320]:
+            - article [ref=e321]:
+              - generic [ref=e322]:
+                - generic [ref=e323]: BUDDY’S TAKE
+                - group [ref=e324]:
+                  - generic "Reply options" [ref=e325] [cursor=pointer]
+              - heading "Let’s look at your question from a few different angles." [level=3] [ref=e326]
+              - paragraph [ref=e327]: Your mission is ready for a first discussion.
+            - generic [ref=e328]:
+              - generic [ref=e329]: Pip ASKS
+              - heading "Who would benefit most, and what do they need?" [level=3] [ref=e330]
+              - generic [ref=e331]:
+                - button "Answer this question" [ref=e332] [cursor=pointer]
+                - button "Skip for now" [ref=e333] [cursor=pointer]
+            - generic [ref=e334]:
+              - generic [ref=e336]:
+                - text: Reply to
+                - combobox "Reply recipient" [ref=e337]:
+                  - option "Whole mission" [selected]
+                  - option "Buddy · Your thinking companion"
+                  - option "Pip · People-first perspective"
+                  - option "Otto · Practical perspective"
+                  - option "Jay · Creative perspective"
+                  - option "Cleo · Critical perspective"
+              - generic [ref=e338]:
+                - generic [ref=e339]: Message your council
+                - textbox "Message your council" [ref=e340]:
+                  - /placeholder: Add your thoughts, ask a question, or share what you know…
+                - generic [ref=e341]:
+                  - generic [ref=e342]:
+                    - button "＋ Attach" [ref=e343] [cursor=pointer]
+                    - button "◉ Voice" [ref=e344] [cursor=pointer]
+                  - button "Send reply →" [disabled] [ref=e345]
+              - generic [ref=e346]:
+                - generic [ref=e347]: Shift + Enter for a new line
+                - button "Summarize and finish" [ref=e348] [cursor=pointer]
+              - paragraph [ref=e349]: "Up to 3 files · 5 MB each · Demo: text, Markdown, CSV, JSON"
+            - group [ref=e350]:
+              - generic "Discussion history 5 contributions" [ref=e351] [cursor=pointer]:
+                - text: Discussion history
+                - generic [ref=e352]: 5 contributions
+            - group [ref=e353]:
+              - generic "Questions 1 open" [ref=e354] [cursor=pointer]:
+                - text: Questions
+                - generic [ref=e355]: 1 open
+      - generic [ref=e356]:
+        - generic [ref=e357]: ThinkBuddy · A little company for big ideas
+        - generic [ref=e358]: Made for curious minds
