@@ -6,5 +6,7 @@ import '@fontsource/geist/700.css';
 import '@fontsource/geist/800.css';
 import '@fontsource/geist/900.css';
 import './globals.css';
+import './pixel.css';
+import StarTrail from './components/StarTrail';
 export const metadata: Metadata = { title:'ThinkBuddy | A little company for big ideas', description:'One question. Many perspectives. A personal thinking council that helps you explore ideas, question assumptions, and find your own way forward.', icons:{icon:'/favicon.svg'} };
-export default function RootLayout({children}:{children:React.ReactNode}) { return <html lang="en"><body>{children}</body></html>; }
+export default function RootLayout({children}:{children:React.ReactNode}) { return <html lang="en"><body><StarTrail/>{children}</body></html>; }

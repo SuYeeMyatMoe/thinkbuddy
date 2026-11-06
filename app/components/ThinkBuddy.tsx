@@ -203,7 +203,7 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
   return <div className="app-shell">
     <div className="navbar-wrap">
       <nav className="navbar" aria-label="Main">
-        <a className="brand" href="/" aria-label="ThinkBuddy home"><span className="brand-icon"><Sprite index={0}/></span><span className="brand-name">ThinkBuddy</span></a>
+        <a className="brand" href="/" aria-label="ThinkBuddy home"><span className="brand-icon" aria-hidden="true">🧠</span><span className="brand-name">ThinkBuddy</span></a>
         <div className={'nav-links '+(sidebar?'is-open':'')}>
           <button className={!missionId&&!modal?'nav-active':''} disabled={busy} onClick={()=>void goHome()}><House size={18} weight="bold"/>Home</button>
           <button className={missionId&&!modal?'nav-active':''} onClick={()=>void goMission()} disabled={busy||!ready}><Target size={18} weight="bold"/>Mission</button>
@@ -231,7 +231,7 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
       {!missionId&&!startingMission?<MissionLanding onStart={newMission} onOpen={openMission} missions={missions} busy={busy} ready={ready}/>:!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
         <section className="mission-card">
           <span className="mission-symbol"><Target size={34} weight="bold"/></span>
-          <div className="mission-text"><span className="mission-eyebrow">Current Mission</span><h2 title={mission.title}>“{mission.title}”</h2></div>
+          <div className="mission-text"><span className="mission-eyebrow">YOUR QUESTION</span><h2 title={mission.title}>“{mission.title}”</h2></div>
           <button className="brutal-button mission-edit" onClick={()=>{setNewTitle("");setModal("new");}} disabled={busy}><Plus size={16} weight="bold"/><span>New Mission</span></button>
         </section>
         <CouncilWorkspace key={mission.id} mission={mission} busy={busy} live={live} saveStatus={saveStatus} progress={progress}
