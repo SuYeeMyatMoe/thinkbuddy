@@ -239,6 +239,7 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
       {!live&&!missionId&&!startingMission&&<div className="demo-notice"><span className="demo-chip"><Sparkle size={13} weight="fill"/>Demo</span><span>{guest?'Guest demo: explore without an account. Missions save in this browser.':'You are exploring a sample council. Live AI requires a configured server API key.'}</span><button onClick={()=>setModal('settings')}>Setup <ArrowUpRight size={13} weight="bold"/></button></div>}
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label="Dismiss error"><X size={17} weight="bold"/></button></div>}
       {!missionId&&!startingMission?<MissionLanding onStart={newMission} onOpen={openMission} missions={missions} busy={busy} ready={ready}/>:!mission?<div className="workspace-loading"><div className="skeleton-line"/><div className="skeleton-stage"/><p>{error?'Your workspace could not load. Refresh to retry.':'Making a little room for your ideas…'}</p></div>:<>
+        {saveStatus==='Not saved'&&<button className="secondary-button" disabled={busy} onClick={()=>void flush().catch(e=>setError((e as Error).message))}>Retry save</button>}
         <section className="mission-card">
           <span className="mission-symbol"><Target size={34} weight="bold"/></span>
           <div className="mission-text"><span className="mission-eyebrow">YOUR QUESTION</span><h2 title={mission.title}>“{mission.title}”</h2></div>
@@ -246,7 +247,7 @@ export default function ThinkBuddy({userName,guest=false,missionId}:{userName:st
         </section>
         <CouncilWorkspace key={mission.id} mission={mission} busy={busy} live={live} saveStatus={saveStatus} progress={progress}
           input={input} setInput={setInput} recording={recording} voiceBusy={voiceBusy} onVoice={()=>void startRecording()}
-          onSend={sendCouncil} onCommand={discussCommand} onChange={edit} onSave={persistMission} onTakeaway={saveTakeaway}
+          onRetry={()=>command('turn',current.current?.messages?.at(-1)?.text??'')} onSend={sendCouncil} onCommand={discussCommand} onChange={edit} onSave={persistMission} onTakeaway={saveTakeaway}
           onOpenSync={()=>void openWorkspaceTool('sync')} onPause={()=>abort.current?.abort()} onManage={setManage} onOpenTool={setTool}/>
         {tool&&<Modal title={toolItems.find(t=>t.id===tool)?.name??'Thinking tools'} wide onClose={()=>setTool(null)}><Suspense fallback={<p>Opening your workspace…</p>}><ToolsPanel tool={tool} mission={mission} onChange={edit} onCommand={async(action,prompt)=>{await command(action,prompt);}} busy={busy} onClose={()=>setTool(null)}/></Suspense></Modal>}
 

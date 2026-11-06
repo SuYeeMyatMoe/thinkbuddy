@@ -6,7 +6,7 @@ const id = () => crypto.randomUUID();
 export const buddy: Mascot = { id: 'buddy', name: 'Buddy', role: 'Your thinking companion', personality: 'Curious, patient, and encouraging', motivation: 'Help you reach your own conclusion', color: '#468B79', sprite: 0 };
 function castFor(title: string): Mascot[] {
   const topic = title.toLowerCase();
-  const cast = /school|eco|sustain|climate/.test(topic)
+  const cast = /\b(school|eco|sustain|climate)\b/.test(topic)
     ? [['Fern', 'Planet-minded thinker', 'What changes would make a meaningful environmental difference?'], ['Pip', 'Student voice', 'Make the idea easy for students to participate in'], ['Otto', 'Practical planner', 'Find a small, affordable first step'], ['Cleo', 'Curious challenger', 'Check whether our assumptions are supported']]
     : /home|house|building/.test(topic)
     ? [['Milo', 'Everyday resident', 'Prioritize comfort and accessibility'], ['Wren', 'Creative designer', 'Explore flexible, welcoming spaces'], ['Otto', 'Budget keeper', 'Understand costs and trade-offs'], ['Fern', 'Resource steward', 'Consider materials and energy use']]
@@ -22,7 +22,7 @@ function statement(mascot: Mascot, text: string, detail: string): Statement {
 }
 export function createDemoMission(title = 'How can we make our school more eco-friendly?'): Mission {
   const mascots = castFor(title);
-  const intro = /school|eco/.test(title.toLowerCase())
+  const intro = /\b(school|eco)\b/.test(title.toLowerCase())
     ? ['Let’s start with one change we can actually measure.', 'Could we reduce waste before buying anything new?', 'Students need a simple way to join in.', 'What could we test with the budget we have?', 'Which idea has evidence behind it?']
     : ['Let’s look at your question from a few different angles.', 'Who would benefit most, and what do they need?', 'What constraints should we work within?', 'Could a different approach solve the same problem?', 'What are we assuming, and how could we check?'];
   const statements = mascots.map((m, i) => statement(m, intro[i], `This is an illustrative demo perspective, not AI-generated analysis. ${m.motivation}. For “${title}”, name a concrete assumption and decide what information would change your view.`));
@@ -65,9 +65,12 @@ export function demoCouncil(req: CouncilRequest): Mission {
     mission.actions.push(...['Write down the assumption you want to test', 'Gather relevant evidence and compare alternatives', 'Run a small experiment and reflect on what changed'].map((text, i) => ({ id: id(), text, done: false, priority: i === 0 ? 'High' as const : 'Medium' as const, deadline: '', dependsOn: '' })));
   } else {
     const selected = mission.mascots.filter(m => m.id !== 'buddy' && (!req.mascotIds?.length || req.mascotIds.includes(m.id)));
-    const prompts = ['What would success look like for the people involved?', 'Which constraint matters most to this decision?', 'Could we test a smaller version before committing?', 'What evidence would make you change your mind?'];
-    const newStatements = selected.map((m, i) => statement(m, prompts[(mission.round + i) % prompts.length], `Illustrative demo reply to “${req.prompt || mission.title}”. ${m.motivation}. Consider a concrete example, an alternative, and a way to test the idea.`));
-    newStatements.push(statement(buddy, 'Which perspective changed your thinking most?', 'Reflect on the arguments rather than accepting a majority vote. What do you believe now, and what remains uncertain?'));
+    const study=/study|schedule|planner/i.test(mission.title);
+    const prompts=study?['Use a missed-session scenario to understand how students recover.','Keep the first rescheduling test small enough to run this week.','Compare flexible rescheduling with a simple reminder.','Observe what people can do, alongside what they say they prefer.']:['Start with one person and a concrete situation.','Name the constraint that limits your next step.','Compare your idea with the current alternative.','Choose an observation that could challenge your assumption.'];
+    const newStatements=selected.map((m,i)=>statement(m,prompts[i%prompts.length],`Illustrative demo suggestion about “${req.prompt||mission.title}”. ${m.motivation}. This is a proposed investigation, not a verified finding.`));
+    const response=statement(buddy,study?'Test flexible rescheduling with a missed-session scenario.':'Choose one uncertain assumption and a small test.',study?'The information you shared can motivate a rescheduling test, but does not establish broader demand. Ask students to recover a missed session and observe what they do. This is an illustrative recommendation, not an adopted decision.':'Use the information you supplied to choose a reversible experiment. Record the outcome and uncertainty before adopting a decision. This is an illustrative recommendation.');
+    if(mission.round<3){response.question='What should the next test help you understand?';response.questionKind='multiple';response.questionOptions=['Whether the problem matters','Whether the idea is usable','Whether people prefer an alternative'];}
+    newStatements.push(response);
     mission.statements.push(...newStatements); mission.round += 1;
     mission = addThinkingNodes(mission, newStatements);
   }

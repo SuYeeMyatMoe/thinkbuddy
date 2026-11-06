@@ -53,6 +53,8 @@ export default function MascotStage({mission,selected,onSelect,busy,active,onDet
   const leave=()=>{keep();closing.current=setTimeout(()=>setInspection(s=>s?.pinned?s:null),250);};
   useEffect(()=>{if(!inspection)return;const close=(e:KeyboardEvent)=>{if(e.key==='Escape')setInspection(null);};document.addEventListener('keydown',close);return()=>document.removeEventListener('keydown',close);},[inspection]);
   useEffect(()=>()=>{if(closing.current)clearTimeout(closing.current);},[]);
+  const mobileAgent=mission.mascots.find(m=>m.id===selected[0])??mission.mascots[0];
+  const mobileStatement=mission.statements.filter(s=>s.mascotId===mobileAgent?.id).at(-1);
   const inspected=mission.mascots.find(m=>m.id===inspection?.id);
   const inspectedStatement=mission.statements.filter(s=>s.mascotId===inspection?.id).at(-1);
   const inspectedQuestion=(mission.questions??[]).find(q=>q.mascotId===inspection?.id&&q.status==='open');
@@ -86,6 +88,7 @@ export default function MascotStage({mission,selected,onSelect,busy,active,onDet
         </div>;
       })}
     </div></div>
+    {mobileStatement&&<button className="mobile-agent-response" onClick={()=>onDetail(mobileStatement)}><strong>{mobileAgent.name} suggests</strong><span>{mobileStatement.text}</span><small>Read explanation & evidence →</small></button>}
     <div className="stage-caption"><HandWaving size={16} weight="fill"/><span>Select a speech card for the explanation.</span><span className="stage-hint">Select a buddy to talk directly</span></div>
     {inspection&&inspected&&createPortal(<aside className="mascot-inspector" role="dialog" aria-label={inspected.name+' details'} style={{left:inspection.x,top:inspection.y,width:inspection.width,maxHeight:`calc(100dvh - ${inspection.y}px - 12px)`}} onPointerEnter={keep} onPointerLeave={leave} onFocus={keep} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node)&&!inspection.pinned)setInspection(null);}}>
       <header><span><strong>{inspected.name}</strong><small>{inspected.role}</small></span><button onClick={()=>setInspection(null)} aria-label="Close mascot details">×</button></header>
